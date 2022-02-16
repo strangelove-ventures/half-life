@@ -1,0 +1,13 @@
+discord:
+  webhook:
+    id: DISCORD_WEBHOOK_ID
+    token: DISCORD_WEBHOOK_TOKEN
+  alert-user-ids: 
+    - DISCORD_USER_ID
+  username: HalfLife
+validators:
+- name: Osmosis
+  rpc: http://SOME_OSMOSIS_RPC_SERVER:26657
+  address: VALIDATOR_HEX_ADDRESS
+  chain-id: osmosis-1
+  bech32-prefix: osmovalcons
