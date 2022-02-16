@@ -3,6 +3,8 @@ module halflife
 go 1.17
 
 require (
+	github.com/DisgoOrg/disgo v0.7.2
+	github.com/DisgoOrg/snowflake v1.0.4
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/spf13/cobra v1.3.0
 	github.com/tendermint/tendermint v0.34.14
@@ -14,9 +16,7 @@ require (
 	github.com/99designs/keyring v1.1.6 // indirect
 	github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
-	github.com/DisgoOrg/disgo v0.7.2 // indirect
 	github.com/DisgoOrg/log v1.1.3 // indirect
-	github.com/DisgoOrg/snowflake v1.0.4 // indirect
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
@@ -44,7 +44,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/go-cmp v0.5.7 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
