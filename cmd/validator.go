@@ -16,6 +16,12 @@ const (
 	rpcErrorRetries = 5
 )
 
+func formattedTime(t time.Time) string {
+	return fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d UTC",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
+}
+
 func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
@@ -63,7 +69,7 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 			errs = append(errs, newOutOfSyncError(vm.RPC))
 		}
 		stats.Height = status.SyncInfo.LatestBlockHeight
-		stats.Timestamp = status.SyncInfo.LatestBlockTime.String()
+		stats.Timestamp = formattedTime(status.SyncInfo.LatestBlockTime)
 		stats.RecentMissedBlocks = 0
 		for i := stats.Height; i > stats.Height-recentBlocksToCheck; i-- {
 			block, err := node.Block(context.Background(), &i)
@@ -77,7 +83,7 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 					if block.Block.Height > stats.LastSignedBlockHeight {
 						stats.LastSignedBlockHeight = block.Block.Height
-						stats.LastSignedBlockTimestamp = block.Block.Time.String()
+						stats.LastSignedBlockTimestamp = formattedTime(block.Block.Time)
 					}
 					found = true
 					break
@@ -101,7 +107,7 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 					for _, voter := range block.Block.LastCommit.Signatures {
 						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 							stats.LastSignedBlockHeight = block.Block.Height
-							stats.LastSignedBlockTimestamp = block.Block.Time.String()
+							stats.LastSignedBlockTimestamp = formattedTime(block.Block.Time)
 							break
 						}
 					}
