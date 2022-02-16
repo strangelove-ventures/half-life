@@ -58,14 +58,16 @@ type ValidatorStats struct {
 }
 
 type ValidatorAlertState struct {
-	AlertTypeCounts           map[int8]int64
-	RecentMissedBlocksCounter int64
+	AlertTypeCounts              map[int8]int64
+	RecentMissedBlocksCounter    int64
+	RecentMissedBlocksCounterMax int64
 }
 
 const (
-	configFilePath      = "./config.yaml"
-	recentBlocksToCheck = 20
-	notifyEvery         = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	configFilePath                    = "./config.yaml"
+	recentBlocksToCheck               = 20
+	notifyEvery                       = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	recentMissedBlocksNotifyThreshold = 10
 )
 
 type JailedError struct{ msg string }
@@ -348,7 +350,7 @@ func sendDiscordAlert(
 			if (*alertState)[vm.Name].AlertTypeCounts[5]%notifyEvery == 0 || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
 				alertString += "• " + err.Error() + "\n"
 				if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
-					if stats.RecentMissedBlocks > 5 {
+					if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
 						if alertLevel < 2 {
 							alertLevel = 2
 						}
@@ -364,6 +366,9 @@ func sendDiscordAlert(
 				}
 			}
 			(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
+			if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounterMax {
+				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = stats.RecentMissedBlocks
+			}
 			(*alertState)[vm.Name].AlertTypeCounts[5]++
 		default:
 			alertString += "• " + err.Error() + "\n"
@@ -373,6 +378,7 @@ func sendDiscordAlert(
 		}
 	}
 
+	notifyForClear := false
 	// iterate through all error types
 	for i := int8(1); i <= 5; i++ {
 		alertTypeFound := false
@@ -388,15 +394,21 @@ func sendDiscordAlert(
 			switch i {
 			case 1:
 				clearedAlertsString += "• jailed\n"
+				notifyForClear = true
 			case 2:
 				clearedAlertsString += "• tombstoned\n"
+				notifyForClear = true
 			case 3:
 				clearedAlertsString += "• out of sync\n"
 			case 4:
 				clearedAlertsString += "• block fetch error\n"
 			case 5:
 				clearedAlertsString += "• missed recent blocks\n"
+				if (*alertState)[vm.Name].RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
+					notifyForClear = true
+				}
 				(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
+				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = 0
 			default:
 			}
 		}
@@ -408,9 +420,11 @@ func sendDiscordAlert(
 
 	if alertString != "" {
 		var alertColor int
+		toNotify := strings.Trim(tagUser, " ")
 		switch alertLevel {
 		case 1:
 			alertColor = 0xFFAC1C
+			toNotify = ""
 		case 3:
 			alertColor = 0x964B00
 		case 2:
@@ -420,10 +434,10 @@ func sendDiscordAlert(
 		}
 		_, err := discordClient.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Discord.Username,
-			Content:  strings.Trim(tagUser, " "),
+			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{
-					Title:       fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
+					Title:       fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
 					Description: fmt.Sprintf("Errors:\n%s", strings.Trim(alertString, "\n")),
 					Color:       alertColor,
 				},
@@ -434,12 +448,16 @@ func sendDiscordAlert(
 		}
 	}
 	if clearedAlertsString != "" {
+		toNotify := ""
+		if notifyForClear {
+			toNotify = strings.Trim(tagUser, " ")
+		}
 		_, err := discordClient.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Discord.Username,
-			Content:  tagUser,
+			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{
-					Title:       fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
+					Title:       fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
 					Description: fmt.Sprintf("Errors cleared:\n%s", strings.Trim(clearedAlertsString, "\n")),
 					Color:       0x00ff00,
 				},
