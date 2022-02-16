@@ -260,7 +260,11 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	}
 
 	if stats.RecentMissedBlocks < recentBlocksToCheck && stats.SlashingPeriodUptime > 75 {
-		color = 0xFFAC1C
+		if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
+			color = 0xFFAC1C
+		} else {
+			color = 0x00FF00
+		}
 	} else {
 		color = 0xFF0000
 	}
@@ -418,6 +422,13 @@ func sendDiscordAlert(
 		tagUser += fmt.Sprintf("<@%s> ", userID)
 	}
 
+	var embedTitle string
+	if stats.SlashingPeriodUptime > 0 {
+		embedTitle = fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime)
+	} else {
+		embedTitle = fmt.Sprintf("%s (N/A%% up)", vm.Name)
+	}
+
 	if alertString != "" {
 		var alertColor int
 		toNotify := strings.Trim(tagUser, " ")
@@ -437,7 +448,7 @@ func sendDiscordAlert(
 			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{
-					Title:       fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
+					Title:       embedTitle,
 					Description: fmt.Sprintf("Errors:\n%s", strings.Trim(alertString, "\n")),
 					Color:       alertColor,
 				},
@@ -457,7 +468,7 @@ func sendDiscordAlert(
 			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{
-					Title:       fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
+					Title:       embedTitle,
 					Description: fmt.Sprintf("Errors cleared:\n%s", strings.Trim(clearedAlertsString, "\n")),
 					Color:       0x00ff00,
 				},
