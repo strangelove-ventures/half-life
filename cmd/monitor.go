@@ -310,7 +310,7 @@ func sendDiscordAlert(
 		case *JailedError:
 			foundAlertTypes = append(foundAlertTypes, 1)
 			if (*alertState)[vm.Name].AlertTypeCounts[1]%notifyEvery == 0 {
-				alertString += err.Error() + "\n"
+				alertString += "• " + err.Error() + "\n"
 				if alertLevel < 2 {
 					alertLevel = 2
 				}
@@ -319,7 +319,7 @@ func sendDiscordAlert(
 		case *TombstonedError:
 			foundAlertTypes = append(foundAlertTypes, 2)
 			if (*alertState)[vm.Name].AlertTypeCounts[2]%notifyEvery == 0 {
-				alertString += err.Error() + "\n"
+				alertString += "• " + err.Error() + "\n"
 				if alertLevel < 3 {
 					alertLevel = 3
 				}
@@ -328,7 +328,7 @@ func sendDiscordAlert(
 		case *OutOfSyncError:
 			foundAlertTypes = append(foundAlertTypes, 3)
 			if (*alertState)[vm.Name].AlertTypeCounts[3]%notifyEvery == 0 {
-				alertString += err.Error() + "\n"
+				alertString += "• " + err.Error() + "\n"
 				if alertLevel < 1 {
 					alertLevel = 1
 				}
@@ -337,7 +337,7 @@ func sendDiscordAlert(
 		case *BlockFetchError:
 			foundAlertTypes = append(foundAlertTypes, 4)
 			if (*alertState)[vm.Name].AlertTypeCounts[4]%notifyEvery == 0 {
-				alertString += err.Error() + "\n"
+				alertString += "• " + err.Error() + "\n"
 				if alertLevel < 1 {
 					alertLevel = 1
 				}
@@ -346,10 +346,16 @@ func sendDiscordAlert(
 		case *MissedRecentBlocksError:
 			foundAlertTypes = append(foundAlertTypes, 5)
 			if (*alertState)[vm.Name].AlertTypeCounts[5]%notifyEvery == 0 || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
-				alertString += err.Error() + "\n"
+				alertString += "• " + err.Error() + "\n"
 				if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
-					if alertLevel < 2 {
-						alertLevel = 2
+					if stats.RecentMissedBlocks > 5 {
+						if alertLevel < 2 {
+							alertLevel = 2
+						}
+					} else {
+						if alertLevel < 1 {
+							alertLevel = 1
+						}
 					}
 				} else {
 					if alertLevel < 1 {
@@ -360,7 +366,7 @@ func sendDiscordAlert(
 			(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
 			(*alertState)[vm.Name].AlertTypeCounts[5]++
 		default:
-			alertString += err.Error() + "\n"
+			alertString += "• " + err.Error() + "\n"
 			if alertLevel < 1 {
 				alertLevel = 1
 			}
@@ -381,15 +387,15 @@ func sendDiscordAlert(
 			(*alertState)[vm.Name].AlertTypeCounts[i] = 0
 			switch i {
 			case 1:
-				clearedAlertsString += "jailed\n"
+				clearedAlertsString += "• jailed\n"
 			case 2:
-				clearedAlertsString += "tombstoned\n"
+				clearedAlertsString += "• tombstoned\n"
 			case 3:
-				clearedAlertsString += "out of sync\n"
+				clearedAlertsString += "• out of sync\n"
 			case 4:
-				clearedAlertsString += "block fetch error\n"
+				clearedAlertsString += "• block fetch error\n"
 			case 5:
-				clearedAlertsString += "missed recent blocks\n"
+				clearedAlertsString += "• missed recent blocks\n"
 				(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
 			default:
 			}
@@ -418,7 +424,7 @@ func sendDiscordAlert(
 			Embeds: []discord.Embed{
 				discord.Embed{
 					Title:       fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
-					Description: strings.Trim(alertString, "\n"),
+					Description: fmt.Sprintf("Errors:\n%s", strings.Trim(alertString, "\n")),
 					Color:       alertColor,
 				},
 			},
@@ -434,7 +440,7 @@ func sendDiscordAlert(
 			Embeds: []discord.Embed{
 				discord.Embed{
 					Title:       fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
-					Description: fmt.Sprintf("Errors cleared: %s\n", strings.Trim(clearedAlertsString, "\n")),
+					Description: fmt.Sprintf("Errors cleared:\n%s", strings.Trim(clearedAlertsString, "\n")),
 					Color:       0x00ff00,
 				},
 			},
