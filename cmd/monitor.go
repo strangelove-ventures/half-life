@@ -256,7 +256,7 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 		}
 
 		return discord.Embed{
-			Title: fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
+			Title: fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
 			Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nMost Recent Signed Blocks: %d/%d",
 				stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
 			Color: color,
@@ -270,7 +270,7 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	}
 
 	return discord.Embed{
-		Title: fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
+		Title: fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime),
 		Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nLast Signed Height: %d\nLast Signed Timestamp: %s\nMost Recent Signed Blocks: %d/%d",
 			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
 		Color: color,
