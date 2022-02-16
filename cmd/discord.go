@@ -133,6 +133,14 @@ func sendDiscordAlert(
 				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = stats.RecentMissedBlocks
 			}
 			(*alertState)[vm.Name].AlertTypeCounts[alertTypeMissedRecentBlocks]++
+		case *GenericRPCError:
+			(*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]++
+			if (*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]%notifyEvery == 0 {
+				alertString += "• " + err.Error() + "\n"
+				if alertLevel < alertLevelWarning {
+					alertLevel = alertLevelWarning
+				}
+			}
 		default:
 			alertString += "• " + err.Error() + "\n"
 			if alertLevel < alertLevelWarning {
@@ -143,7 +151,7 @@ func sendDiscordAlert(
 
 	notifyForClear := false
 	// iterate through all error types
-	for i := alertTypeJailed; i <= alertTypeMissedRecentBlocks; i++ {
+	for i := alertTypeJailed; i <= alertTypeGenericRPC; i++ {
 		alertTypeFound := false
 		for _, alertType := range foundAlertTypes {
 			if i == alertType {
@@ -172,6 +180,8 @@ func sendDiscordAlert(
 				}
 				(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
 				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = 0
+			case alertTypeGenericRPC:
+				clearedAlertsString += "• generic rpc error\n"
 			default:
 			}
 		}

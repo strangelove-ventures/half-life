@@ -23,6 +23,7 @@ const (
 	alertTypeOutOfSync          = int8(3)
 	alertTypeBlockFetch         = int8(4)
 	alertTypeMissedRecentBlocks = int8(5)
+	alertTypeGenericRPC         = int8(6)
 )
 
 type ValidatorStats struct {
