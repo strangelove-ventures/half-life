@@ -170,9 +170,9 @@ func sendDiscordAlert(
 				clearedAlertsString += "• tombstoned\n"
 				notifyForClear = true
 			case alertTypeOutOfSync:
-				clearedAlertsString += "• out of sync\n"
+				clearedAlertsString += "• rpc server out of sync\n"
 			case alertTypeBlockFetch:
-				clearedAlertsString += "• block fetch error\n"
+				clearedAlertsString += "• rpc block fetch error\n"
 			case alertTypeMissedRecentBlocks:
 				clearedAlertsString += "• missed recent blocks\n"
 				if (*alertState)[vm.Name].RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
