@@ -134,13 +134,14 @@ func sendDiscordAlert(
 			}
 			(*alertState)[vm.Name].AlertTypeCounts[alertTypeMissedRecentBlocks]++
 		case *GenericRPCError:
-			(*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]++
+			foundAlertTypes = append(foundAlertTypes, alertTypeGenericRPC)
 			if (*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]%notifyEvery == 0 {
 				alertString += "• " + err.Error() + "\n"
 				if alertLevel < alertLevelWarning {
 					alertLevel = alertLevelWarning
 				}
 			}
+			(*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]++
 		default:
 			alertString += "• " + err.Error() + "\n"
 			if alertLevel < alertLevelWarning {
