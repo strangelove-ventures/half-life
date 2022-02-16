@@ -247,17 +247,33 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 }
 
 func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Embed {
+	var color int
 	if stats.Height == stats.LastSignedBlockHeight {
+		if stats.RecentMissedBlocks == 0 && stats.SlashingPeriodUptime > 75 {
+			color = 0x00FF00
+		} else {
+			color = 0xFFAC1C
+		}
+
 		return discord.Embed{
 			Title: fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
 			Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nMost Recent Signed Blocks: %d/%d",
 				stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
+			Color: color,
 		}
 	}
+
+	if stats.RecentMissedBlocks < recentBlocksToCheck && stats.SlashingPeriodUptime > 75 {
+		color = 0xFFAC1C
+	} else {
+		color = 0xFF0000
+	}
+
 	return discord.Embed{
 		Title: fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
 		Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nLast Signed Height: %d\nLast Signed Timestamp: %s\nMost Recent Signed Blocks: %d/%d",
 			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
+		Color: color,
 	}
 }
 
