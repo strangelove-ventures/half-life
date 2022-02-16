@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -46,7 +45,6 @@ type ValidatorMonitor struct {
 	RPC                    string  `yaml:"rpc"`
 	Address                string  `yaml:"address"`
 	ChainID                string  `yaml:"chain-id"`
-	Bech32Prefix           string  `yaml:"bech32-prefix"`
 	DiscordStatusMessageID *string `yaml:"discord-status-message-id"`
 }
 
@@ -152,17 +150,13 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 		errs = append(errs, err)
 		return
 	}
-	address, err := hex.DecodeString(vm.Address)
+	_, hexAddress, err := bech32.DecodeAndConvert(vm.Address)
 	if err != nil {
 		errs = append(errs, err)
 		return
 	}
-	bech32Address, err := bech32.ConvertAndEncode(vm.Bech32Prefix, address)
-	if err != nil {
-		errs = append(errs, err)
-		return
-	}
-	valInfo, err := getSigningInfo(client, bech32Address)
+
+	valInfo, err := getSigningInfo(client, vm.Address)
 	if err != nil {
 		errs = append(errs, err)
 	} else {
@@ -204,7 +198,7 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 			}
 			found := false
 			for _, voter := range block.Block.LastCommit.Signatures {
-				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(address)) {
+				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 					if block.Block.Height > stats.LastSignedBlockHeight {
 						stats.LastSignedBlockHeight = block.Block.Height
 						stats.LastSignedBlockTimestamp = block.Block.Time.String()
@@ -229,7 +223,7 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 						break
 					}
 					for _, voter := range block.Block.LastCommit.Signatures {
-						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(address)) {
+						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 							stats.LastSignedBlockHeight = block.Block.Height
 							stats.LastSignedBlockTimestamp = block.Block.Time.String()
 							break

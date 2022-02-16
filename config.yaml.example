@@ -8,6 +8,5 @@ discord:
 validators:
 - name: Osmosis
   rpc: http://SOME_OSMOSIS_RPC_SERVER:26657
-  address: VALIDATOR_HEX_ADDRESS
+  address: BECH32_CONSVAL_ADDRESS
   chain-id: osmosis-1
-  bech32-prefix: osmovalcons
