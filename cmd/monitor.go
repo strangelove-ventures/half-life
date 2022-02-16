@@ -302,51 +302,71 @@ func sendDiscordAlert(
 	}
 	var foundAlertTypes []int8
 	alertString := ""
+	alertLevel := 0
 	clearedAlertsString := ""
-	if len(errs) == 0 {
-		// reset all alert type counts so they notify immediately if they occur again
-		for key := range (*alertState)[vm.Name].AlertTypeCounts {
-			(*alertState)[vm.Name].AlertTypeCounts[key] = 0
-		}
-	} else {
-		for _, err := range errs {
-			switch err.(type) {
-			case *JailedError:
-				foundAlertTypes = append(foundAlertTypes, 1)
-				if (*alertState)[vm.Name].AlertTypeCounts[1]%notifyEvery == 0 {
-					alertString += err.Error() + "\n"
-				}
-				(*alertState)[vm.Name].AlertTypeCounts[1]++
-			case *TombstonedError:
-				foundAlertTypes = append(foundAlertTypes, 2)
-				if (*alertState)[vm.Name].AlertTypeCounts[2]%notifyEvery == 0 {
-					alertString += err.Error() + "\n"
-				}
-				(*alertState)[vm.Name].AlertTypeCounts[2]++
-			case *OutOfSyncError:
-				foundAlertTypes = append(foundAlertTypes, 3)
-				if (*alertState)[vm.Name].AlertTypeCounts[3]%notifyEvery == 0 {
-					alertString += err.Error() + "\n"
-				}
-				(*alertState)[vm.Name].AlertTypeCounts[3]++
-			case *BlockFetchError:
-				foundAlertTypes = append(foundAlertTypes, 4)
-				if (*alertState)[vm.Name].AlertTypeCounts[4]%notifyEvery == 0 {
-					alertString += err.Error() + "\n"
-				}
-				(*alertState)[vm.Name].AlertTypeCounts[4]++
-			case *MissedRecentBlocksError:
-				foundAlertTypes = append(foundAlertTypes, 5)
-				if (*alertState)[vm.Name].AlertTypeCounts[5]%notifyEvery == 0 || stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
-					alertString += err.Error() + "\n"
-				}
-				(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
-				(*alertState)[vm.Name].AlertTypeCounts[5]++
-			default:
+
+	for _, err := range errs {
+		switch err.(type) {
+		case *JailedError:
+			foundAlertTypes = append(foundAlertTypes, 1)
+			if (*alertState)[vm.Name].AlertTypeCounts[1]%notifyEvery == 0 {
 				alertString += err.Error() + "\n"
+				if alertLevel < 2 {
+					alertLevel = 2
+				}
+			}
+			(*alertState)[vm.Name].AlertTypeCounts[1]++
+		case *TombstonedError:
+			foundAlertTypes = append(foundAlertTypes, 2)
+			if (*alertState)[vm.Name].AlertTypeCounts[2]%notifyEvery == 0 {
+				alertString += err.Error() + "\n"
+				if alertLevel < 3 {
+					alertLevel = 3
+				}
+			}
+			(*alertState)[vm.Name].AlertTypeCounts[2]++
+		case *OutOfSyncError:
+			foundAlertTypes = append(foundAlertTypes, 3)
+			if (*alertState)[vm.Name].AlertTypeCounts[3]%notifyEvery == 0 {
+				alertString += err.Error() + "\n"
+				if alertLevel < 1 {
+					alertLevel = 1
+				}
+			}
+			(*alertState)[vm.Name].AlertTypeCounts[3]++
+		case *BlockFetchError:
+			foundAlertTypes = append(foundAlertTypes, 4)
+			if (*alertState)[vm.Name].AlertTypeCounts[4]%notifyEvery == 0 {
+				alertString += err.Error() + "\n"
+				if alertLevel < 1 {
+					alertLevel = 1
+				}
+			}
+			(*alertState)[vm.Name].AlertTypeCounts[4]++
+		case *MissedRecentBlocksError:
+			foundAlertTypes = append(foundAlertTypes, 5)
+			if (*alertState)[vm.Name].AlertTypeCounts[5]%notifyEvery == 0 || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
+				alertString += err.Error() + "\n"
+				if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
+					if alertLevel < 2 {
+						alertLevel = 2
+					}
+				} else {
+					if alertLevel < 1 {
+						alertLevel = 1
+					}
+				}
+			}
+			(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
+			(*alertState)[vm.Name].AlertTypeCounts[5]++
+		default:
+			alertString += err.Error() + "\n"
+			if alertLevel < 1 {
+				alertLevel = 1
 			}
 		}
 	}
+
 	// iterate through all error types
 	for i := int8(1); i <= 5; i++ {
 		alertTypeFound := false
@@ -381,6 +401,17 @@ func sendDiscordAlert(
 	}
 
 	if alertString != "" {
+		var alertColor int
+		switch alertLevel {
+		case 1:
+			alertColor = 0xFFAC1C
+		case 3:
+			alertColor = 0x964B00
+		case 2:
+			fallthrough
+		default:
+			alertColor = 0xFF0000
+		}
 		_, err := discordClient.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Discord.Username,
 			Content:  strings.Trim(tagUser, " "),
@@ -388,7 +419,7 @@ func sendDiscordAlert(
 				discord.Embed{
 					Title:       fmt.Sprintf("%s (%.02f %% up)", vm.Name, stats.SlashingPeriodUptime),
 					Description: strings.Trim(alertString, "\n"),
-					Color:       0xff0000,
+					Color:       alertColor,
 				},
 			},
 		})
@@ -449,7 +480,6 @@ func runMonitor(
 	stats, errs := monitorValidator(vm)
 	if errs != nil {
 		fmt.Printf("Got validator errors: +%v\n", errs)
-
 	} else {
 		fmt.Printf("No errors found for validator: %s\n", vm.Name)
 	}

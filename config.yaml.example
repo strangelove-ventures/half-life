@@ -10,3 +10,7 @@ validators:
   rpc: http://SOME_OSMOSIS_RPC_SERVER:26657
   address: BECH32_CONSVAL_ADDRESS
   chain-id: osmosis-1
+- name: Juno
+  rpc: http://SOME_JUNO_RPC_SERVER:26657
+  address: junovalcons...
+  chain-id: juno-1
