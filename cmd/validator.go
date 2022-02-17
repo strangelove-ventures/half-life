@@ -17,9 +17,7 @@ const (
 )
 
 func formattedTime(t time.Time) string {
-	return fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d UTC",
-		t.Year(), t.Month(), t.Day(),
-		t.Hour(), t.Minute(), t.Second())
+	return fmt.Sprintf("<t:%d>", t.Unix())
 }
 
 func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error) {
