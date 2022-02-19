@@ -121,37 +121,39 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 }
 
 func runMonitor(
-	wg *sync.WaitGroup,
 	alertState *map[string]*ValidatorAlertState,
 	discordClient *webhook.Client,
 	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
 	writeConfigMutex *sync.Mutex,
 ) {
-	var stats ValidatorStats
-	var errs []error
-	for i := 0; i < rpcErrorRetries; i++ {
-		stats, errs = monitorValidator(vm)
-		if errs == nil {
-			fmt.Printf("No errors found for validator: %s\n", vm.Name)
-			break
-		}
-		fmt.Printf("Got validator errors: +%v\n", errs)
-		foundNonRPCError := false
-		for _, err := range errs {
-			if _, ok := err.(*GenericRPCError); !ok {
-				foundNonRPCError = true
+	for {
+		var stats ValidatorStats
+		var errs []error
+		for i := 0; i < rpcErrorRetries; i++ {
+			stats, errs = monitorValidator(vm)
+			if errs == nil {
+				fmt.Printf("No errors found for validator: %s\n", vm.Name)
 				break
 			}
+			fmt.Printf("Got validator errors: +%v\n", errs)
+			foundNonRPCError := false
+			for _, err := range errs {
+				if _, ok := err.(*GenericRPCError); !ok {
+					foundNonRPCError = true
+					break
+				}
+			}
+			if foundNonRPCError {
+				break
+			}
+			if i < rpcErrorRetries-1 {
+				fmt.Println("Found only RPC errors, retrying")
+				time.Sleep(time.Duration((i*i)+1) * time.Second) // exponential backoff retry
+			}
+			// loop again up to n times if we are hitting only generic RPC errors
 		}
-		if foundNonRPCError {
-			break
-		}
-		if i < rpcErrorRetries-1 {
-			fmt.Println("Found only RPC errors, retrying")
-		}
-		// loop again up to n times if we are hitting only generic RPC errors
+		sendDiscordAlert(vm, stats, alertState, discordClient, config, errs, writeConfigMutex)
+		time.Sleep(30 * time.Second)
 	}
-	sendDiscordAlert(vm, stats, alertState, discordClient, config, errs, writeConfigMutex)
-	wg.Done()
 }

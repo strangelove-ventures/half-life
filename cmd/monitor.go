@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/DisgoOrg/disgo/webhook"
 	"github.com/DisgoOrg/snowflake"
@@ -29,14 +28,12 @@ var monitorCmd = &cobra.Command{
 		writeConfigMutex := sync.Mutex{}
 		discordClient := webhook.NewClient(snowflake.Snowflake(config.Discord.Webhook.ID), config.Discord.Webhook.Token)
 		alertState := make(map[string]*ValidatorAlertState)
-		for {
-			wg := sync.WaitGroup{}
-			wg.Add(len(config.Validators))
-			for _, vm := range config.Validators {
-				go runMonitor(&wg, &alertState, discordClient, &config, vm, &writeConfigMutex)
+		for i, vm := range config.Validators {
+			if i == len(config.Validators)-1 {
+				runMonitor(&alertState, discordClient, &config, vm, &writeConfigMutex)
+			} else {
+				go runMonitor(&alertState, discordClient, &config, vm, &writeConfigMutex)
 			}
-			wg.Wait()
-			time.Sleep(30 * time.Second)
 		}
 	},
 }
