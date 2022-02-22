@@ -69,12 +69,15 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 		stats.Height = status.SyncInfo.LatestBlockHeight
 		stats.Timestamp = formattedTime(status.SyncInfo.LatestBlockTime)
 		stats.RecentMissedBlocks = 0
-		for i := stats.Height; i > stats.Height-recentBlocksToCheck; i-- {
+		for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
 			block, err := node.Block(context.Background(), &i)
 			if err != nil {
 				// generic RPC error for this one so it will be included in the generic RPC error retry
 				errs = append(errs, newGenericRPCError(newBlockFetchError(i, vm.RPC).Error()))
 				continue
+			}
+			if i == 1 {
+				break
 			}
 			found := false
 			for _, voter := range block.Block.LastCommit.Signatures {
@@ -96,10 +99,13 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
-				for i := stats.Height - recentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod); i-- {
+				for i := stats.Height - recentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod) && i > 0; i-- {
 					block, err := node.Block(context.Background(), &i)
 					if err != nil {
 						errs = append(errs, newBlockFetchError(i, vm.RPC))
+						break
+					}
+					if i == 1 {
 						break
 					}
 					for _, voter := range block.Block.LastCommit.Signatures {
