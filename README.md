@@ -27,7 +27,7 @@ halflife monitor
 
 When a validator is first added to `config.yaml` and halflife is started, a status message will be created in the discord channel and the ID of that message will be added to `config.yaml`. Pin this message so that the channel's pinned messages can act as a dashboard to see the realtime status of the validators.
 
-![Screenshot from 2022-02-16 11-43-37](https://user-images.githubusercontent.com/6722152/154334177-995adbdf-1b68-4bf9-b5ce-622219b94e90.png)
+![Screenshot from 2022-02-23 13-34-27](https://user-images.githubusercontent.com/6722152/155403834-d20952b3-b657-4264-8258-d882381f456c.png)
 
 Alerts will be posted when any error conditions are detected, and follow up messages will be posted when those errors are cleared.
 
