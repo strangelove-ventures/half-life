@@ -9,27 +9,52 @@ import (
 )
 
 const (
-	configFilePath                    = "./config.yaml"
-	recentBlocksToCheck               = 20
-	notifyEvery                       = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
-	recentMissedBlocksNotifyThreshold = 10
+	configFilePath                       = "./config.yaml"
+	slashingPeriodUptimeWarningThreshold = 99.80
+	slashingPeriodUptimeErrorThreshold   = 98
+	recentBlocksToCheck                  = 20
+	notifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	recentMissedBlocksNotifyThreshold    = 10
+	sentryGRPCErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
+	sentryOutOfSyncErrorNotifyThreshold  = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
+)
 
-	alertLevelWarning  = int8(1)
-	alertLevelHigh     = int8(2)
-	alertLevelCritical = int8(3)
+type AlertLevel int8
 
-	alertTypeJailed             = int8(1)
-	alertTypeTombstoned         = int8(2)
-	alertTypeOutOfSync          = int8(3)
-	alertTypeBlockFetch         = int8(4)
-	alertTypeMissedRecentBlocks = int8(5)
-	alertTypeGenericRPC         = int8(6)
+const (
+	alertLevelNone AlertLevel = iota
+	alertLevelWarning
+	alertLevelHigh
+	alertLevelCritical
+)
+
+type AlertType int8
+
+const (
+	alertTypeJailed AlertType = iota
+	alertTypeTombstoned
+	alertTypeOutOfSync
+	alertTypeBlockFetch
+	alertTypeMissedRecentBlocks
+	alertTypeGenericRPC
+
+	// leave this at the end for iteration
+	alertTypeEnd
+)
+
+type SentryAlertType int8
+
+const (
+	sentryAlertTypeNone SentryAlertType = iota
+	sentryAlertTypeGRPCError
+	sentryAlertTypeOutOfSyncError
 )
 
 type SentryStats struct {
-	Name    string
-	Version string
-	Height  int64
+	Name            string
+	Version         string
+	Height          int64
+	SentryAlertType SentryAlertType
 }
 
 type ValidatorStats struct {
@@ -40,14 +65,22 @@ type ValidatorStats struct {
 	LastSignedBlockTimestamp string
 	SlashingPeriodUptime     float64
 	SentryStats              []SentryStats
+	AlertLevel               AlertLevel
 }
 
 type ValidatorAlertState struct {
-	AlertTypeCounts              map[int8]int64
+	AlertTypeCounts              map[AlertType]int64
 	SentryGRPCErrorCounts        map[string]int64
 	SentryOutOfSyncErrorCounts   map[string]int64
 	RecentMissedBlocksCounter    int64
 	RecentMissedBlocksCounterMax int64
+}
+
+type ValidatorAlertNotification struct {
+	Alerts         []string
+	ClearedAlerts  []string
+	NotifyForClear bool
+	AlertLevel     AlertLevel
 }
 
 type HalfLifeConfig struct {

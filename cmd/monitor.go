@@ -5,8 +5,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/DisgoOrg/disgo/webhook"
-	"github.com/DisgoOrg/snowflake"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 )
@@ -26,13 +24,14 @@ var monitorCmd = &cobra.Command{
 			log.Fatalf("Error parsing config.yaml: %v", err)
 		}
 		writeConfigMutex := sync.Mutex{}
-		discordClient := webhook.NewClient(snowflake.Snowflake(config.Discord.Webhook.ID), config.Discord.Webhook.Token)
+		// TODO implement more notification services e.g. slack, email
+		notificationService := NewDiscordNotificationService(config.Discord.Webhook.ID, config.Discord.Webhook.Token)
 		alertState := make(map[string]*ValidatorAlertState)
 		for i, vm := range config.Validators {
 			if i == len(config.Validators)-1 {
-				runMonitor(&alertState, discordClient, &config, vm, &writeConfigMutex)
+				runMonitor(notificationService, &alertState, &config, vm, &writeConfigMutex)
 			} else {
-				go runMonitor(&alertState, discordClient, &config, vm, &writeConfigMutex)
+				go runMonitor(notificationService, &alertState, &config, vm, &writeConfigMutex)
 			}
 		}
 	},
