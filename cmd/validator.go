@@ -13,17 +13,18 @@ import (
 )
 
 const (
-	rpcErrorRetries = 5
+	rpcErrorRetries    = 5
+	outOfSyncThreshold = 5
 )
 
 func formattedTime(t time.Time) string {
-	return fmt.Sprintf("<t:%d>", t.Unix())
+	return fmt.Sprintf("<t:%d:R>", t.Unix())
 }
 
 func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
-	client, err := getCosmosClient(vm)
+	client, err := getCosmosClient(vm.RPC, vm.ChainID)
 	if err != nil {
 		errs = append(errs, newGenericRPCError(err.Error()))
 		return
@@ -126,6 +127,49 @@ func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error)
 	return
 }
 
+func monitorSentry(
+	wg *sync.WaitGroup,
+	errs *[]error,
+	errsLock *sync.Mutex,
+	sentry Sentry,
+	stats *ValidatorStats,
+	vm *ValidatorMonitor,
+) {
+	nodeInfo, syncInfo, err := getSentryInfo(sentry.GRPC)
+	if err != nil {
+		err := newSentryGRPCError(sentry.Name, err.Error())
+		errsLock.Lock()
+		*errs = append(*errs, err)
+		errsLock.Unlock()
+		wg.Done()
+		return
+	}
+	stats.SentryStats = append(stats.SentryStats, SentryStats{Name: sentry.Name, Height: syncInfo.Block.Header.Height, Version: nodeInfo.ApplicationVersion.GetVersion()})
+	if stats.Height-syncInfo.Block.Header.Height > outOfSyncThreshold {
+		err := newSentryOutOfSyncError(sentry.Name, fmt.Sprintf("Height: %d not in sync with RPC Height: %d", syncInfo.Block.Header.Height, stats.Height))
+		errsLock.Lock()
+		*errs = append(*errs, err)
+		errsLock.Unlock()
+	}
+	wg.Done()
+}
+
+func monitorSentries(
+	stats *ValidatorStats,
+	vm *ValidatorMonitor,
+) []error {
+	errs := make([]error, 0)
+	wg := sync.WaitGroup{}
+	errsLock := sync.Mutex{}
+	sentries := *vm.Sentries
+	wg.Add(len(sentries))
+	for _, sentry := range sentries {
+		go monitorSentry(&wg, &errs, &errsLock, sentry, stats, vm)
+	}
+	wg.Wait()
+	return errs
+}
+
 func runMonitor(
 	alertState *map[string]*ValidatorAlertState,
 	discordClient *webhook.Client,
@@ -136,7 +180,15 @@ func runMonitor(
 	for {
 		var stats ValidatorStats
 		var errs []error
-		for i := 0; i < rpcErrorRetries; i++ {
+
+		var rpcRetries int
+		if vm.RPCRetries != nil {
+			rpcRetries = *vm.RPCRetries
+		} else {
+			rpcRetries = rpcErrorRetries
+		}
+
+		for i := 0; i < rpcRetries; i++ {
 			stats, errs = monitorValidator(vm)
 			if errs == nil {
 				fmt.Printf("No errors found for validator: %s\n", vm.Name)
@@ -153,12 +205,20 @@ func runMonitor(
 			if foundNonRPCError {
 				break
 			}
-			if i < rpcErrorRetries-1 {
+			if i < rpcRetries-1 {
 				fmt.Println("Found only RPC errors, retrying")
 				time.Sleep(time.Duration((i*i)+1) * time.Second) // exponential backoff retry
 			}
 			// loop again up to n times if we are hitting only generic RPC errors
 		}
+
+		if vm.Sentries != nil {
+			sentryErrs := monitorSentries(&stats, vm)
+			if sentryErrs != nil {
+				errs = append(errs, sentryErrs...)
+			}
+		}
+
 		sendDiscordAlert(vm, stats, alertState, discordClient, config, errs, writeConfigMutex)
 		time.Sleep(30 * time.Second)
 	}

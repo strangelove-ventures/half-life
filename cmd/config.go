@@ -26,6 +26,12 @@ const (
 	alertTypeGenericRPC         = int8(6)
 )
 
+type SentryStats struct {
+	Name    string
+	Version string
+	Height  int64
+}
+
 type ValidatorStats struct {
 	Timestamp                string
 	Height                   int64
@@ -33,10 +39,13 @@ type ValidatorStats struct {
 	LastSignedBlockHeight    int64
 	LastSignedBlockTimestamp string
 	SlashingPeriodUptime     float64
+	SentryStats              []SentryStats
 }
 
 type ValidatorAlertState struct {
 	AlertTypeCounts              map[int8]int64
+	SentryGRPCErrorCounts        map[string]int64
+	SentryOutOfSyncErrorCounts   map[string]int64
 	RecentMissedBlocksCounter    int64
 	RecentMissedBlocksCounterMax int64
 }
@@ -57,12 +66,19 @@ type DiscordChannelConfig struct {
 	Username     string               `yaml:"username"`
 }
 
+type Sentry struct {
+	Name string `yaml:"name"`
+	GRPC string `yaml:"grpc"`
+}
+
 type ValidatorMonitor struct {
-	Name                   string  `yaml:"name"`
-	RPC                    string  `yaml:"rpc"`
-	Address                string  `yaml:"address"`
-	ChainID                string  `yaml:"chain-id"`
-	DiscordStatusMessageID *string `yaml:"discord-status-message-id"`
+	Name                   string    `yaml:"name"`
+	RPC                    string    `yaml:"rpc"`
+	Address                string    `yaml:"address"`
+	ChainID                string    `yaml:"chain-id"`
+	DiscordStatusMessageID *string   `yaml:"discord-status-message-id"`
+	RPCRetries             *int      `yaml:"rpc-retries"`
+	Sentries               *[]Sentry `yaml:"sentries"`
 }
 
 func saveConfig(config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {

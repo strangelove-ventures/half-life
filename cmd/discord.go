@@ -18,6 +18,24 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	} else {
 		uptime = fmt.Sprintf("%.02f%%", stats.SlashingPeriodUptime)
 	}
+
+	sentryString := ""
+	if vm.Sentries != nil {
+		for _, vmSentry := range *vm.Sentries {
+			sentryFound := false
+			for _, sentry := range stats.SentryStats {
+				if vmSentry.Name == sentry.Name {
+					sentryString += fmt.Sprintf("\n**%s** - Height **%d** - Version **%s**", sentry.Name, sentry.Height, sentry.Version)
+					sentryFound = true
+					break
+				}
+			}
+			if !sentryFound {
+				sentryString += fmt.Sprintf("\n**%s** - Height **N/A** - Version **N/A**", vmSentry.Name)
+			}
+		}
+	}
+
 	if stats.Height == stats.LastSignedBlockHeight {
 		if stats.RecentMissedBlocks == 0 && stats.SlashingPeriodUptime > 75 {
 			color = 0x00FF00
@@ -27,8 +45,8 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 
 		return discord.Embed{
 			Title: fmt.Sprintf("%s (%s up)", vm.Name, uptime),
-			Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nMost Recent Signed Blocks: %d/%d",
-				stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
+			Description: fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nMost Recent Signed Blocks: **%d/%d**%s",
+				stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString),
 			Color: color,
 		}
 	}
@@ -45,8 +63,8 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 
 	return discord.Embed{
 		Title: fmt.Sprintf("%s (%s up)", vm.Name, uptime),
-		Description: fmt.Sprintf("Latest Timestamp: %s\nLatest Height: %d\nLast Signed Height: %d\nLast Signed Timestamp: %s\nMost Recent Signed Blocks: %d/%d",
-			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck),
+		Description: fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nLast Signed Height: **%d**\nLast Signed Timestamp: **%s**\nMost Recent Signed Blocks: **%d/%d**%s",
+			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString),
 		Color: color,
 	}
 }
@@ -62,16 +80,20 @@ func sendDiscordAlert(
 ) {
 	if (*alertState)[vm.Name] == nil {
 		(*alertState)[vm.Name] = &ValidatorAlertState{
-			AlertTypeCounts: make(map[int8]int64),
+			AlertTypeCounts:            make(map[int8]int64),
+			SentryGRPCErrorCounts:      make(map[string]int64),
+			SentryOutOfSyncErrorCounts: make(map[string]int64),
 		}
 	}
 	var foundAlertTypes []int8
+	var foundSentryGRPCErrors []string
+	var foundSentryOutOfSyncErrors []string
 	alertString := ""
 	alertLevel := int8(0)
 	clearedAlertsString := ""
 
 	for _, err := range errs {
-		switch err.(type) {
+		switch err := err.(type) {
 		case *JailedError:
 			foundAlertTypes = append(foundAlertTypes, alertTypeJailed)
 			if (*alertState)[vm.Name].AlertTypeCounts[alertTypeJailed]%notifyEvery == 0 {
@@ -142,6 +164,26 @@ func sendDiscordAlert(
 				}
 			}
 			(*alertState)[vm.Name].AlertTypeCounts[alertTypeGenericRPC]++
+		case *SentryGRPCError:
+			sentryName := err.sentry
+			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
+			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 {
+				alertString += "• " + err.Error() + "\n"
+				if alertLevel < alertLevelHigh {
+					alertLevel = alertLevelHigh
+				}
+			}
+			(*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]++
+		case *SentryOutOfSyncError:
+			sentryName := err.sentry
+			foundSentryOutOfSyncErrors = append(foundSentryOutOfSyncErrors, sentryName)
+			if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 {
+				alertString += "• " + err.Error() + "\n"
+				if alertLevel < alertLevelHigh {
+					alertLevel = alertLevelHigh
+				}
+			}
+			(*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]++
 		default:
 			alertString += "• " + err.Error() + "\n"
 			if alertLevel < alertLevelWarning {
@@ -187,6 +229,32 @@ func sendDiscordAlert(
 			}
 		}
 	}
+	for sentryName := range (*alertState)[vm.Name].SentryGRPCErrorCounts {
+		sentryFound := false
+		for _, foundSentryName := range foundSentryGRPCErrors {
+			if foundSentryName == sentryName {
+				sentryFound = true
+				break
+			}
+		}
+		if !sentryFound && (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] > 0 {
+			(*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] = 0
+			clearedAlertsString += fmt.Sprintf("• %s grpc error\n", sentryName)
+		}
+	}
+	for sentryName := range (*alertState)[vm.Name].SentryOutOfSyncErrorCounts {
+		sentryFound := false
+		for _, foundSentryName := range foundSentryOutOfSyncErrors {
+			if foundSentryName == sentryName {
+				sentryFound = true
+				break
+			}
+		}
+		if !sentryFound && (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] > 0 {
+			(*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] = 0
+			clearedAlertsString += fmt.Sprintf("• %s out of sync error\n", sentryName)
+		}
+	}
 	tagUser := ""
 	for _, userID := range config.Discord.AlertUserIDs {
 		tagUser += fmt.Sprintf("<@%s> ", userID)
@@ -219,7 +287,7 @@ func sendDiscordAlert(
 			Embeds: []discord.Embed{
 				discord.Embed{
 					Title:       embedTitle,
-					Description: fmt.Sprintf("Errors:\n%s", strings.Trim(alertString, "\n")),
+					Description: fmt.Sprintf("**Errors:**\n%s", strings.Trim(alertString, "\n")),
 					Color:       alertColor,
 				},
 			},
@@ -239,7 +307,7 @@ func sendDiscordAlert(
 			Embeds: []discord.Embed{
 				discord.Embed{
 					Title:       embedTitle,
-					Description: fmt.Sprintf("Errors cleared:\n%s", strings.Trim(clearedAlertsString, "\n")),
+					Description: fmt.Sprintf("**Errors cleared:**\n%s", strings.Trim(clearedAlertsString, "\n")),
 					Color:       0x00ff00,
 				},
 			},

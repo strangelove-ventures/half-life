@@ -46,3 +46,23 @@ func (e *GenericRPCError) Error() string { return e.msg }
 func newGenericRPCError(msg string) *GenericRPCError {
 	return &GenericRPCError{msg}
 }
+
+type SentryGRPCError struct {
+	sentry string
+	msg    string
+}
+
+func (e *SentryGRPCError) Error() string { return fmt.Sprintf("%s - %s", e.sentry, e.msg) }
+func newSentryGRPCError(sentry string, msg string) *SentryGRPCError {
+	return &SentryGRPCError{sentry, msg}
+}
+
+type SentryOutOfSyncError struct {
+	sentry string
+	msg    string
+}
+
+func (e *SentryOutOfSyncError) Error() string { return fmt.Sprintf("%s - %s", e.sentry, e.msg) }
+func newSentryOutOfSyncError(sentry string, msg string) *SentryOutOfSyncError {
+	return &SentryOutOfSyncError{sentry, msg}
+}
