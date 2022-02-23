@@ -10,7 +10,15 @@ validators:
   rpc: http://SOME_OSMOSIS_RPC_SERVER:26657
   address: BECH32_CONSVAL_ADDRESS
   chain-id: osmosis-1
+  sentries:
+    - name: sentry-1
+      grpc: 1.2.3.4:9090
+    - name: sentry-2
+      grpc: 1.2.3.5:9090
+    - name: sentry-3
+      grpc: 1.2.3.6:9090
 - name: Juno
   rpc: http://SOME_JUNO_RPC_SERVER:26657
   address: junovalcons...
   chain-id: juno-1
+  rpc-retries: 20

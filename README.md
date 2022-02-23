@@ -14,7 +14,9 @@ Discord messages are created in the configured webhook channel for:
 
 ## Quick start
 
-Copy `config.yaml.example` to `config.yaml` and populate with your discord and validator information
+Copy `config.yaml.example` to `config.yaml` and populate with your discord and validator information. 
+You can optionally provide the `sentries` array to also monitor the sentries via grpc.
+`rpc-retries` can optionally be provided to override the default of 5 RPC retries before alerting, useful for congested RPC servers.
 
 See [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for how to create a webhook for a discord channel.
 
