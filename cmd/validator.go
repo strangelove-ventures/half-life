@@ -20,7 +20,10 @@ func formattedTime(t time.Time) string {
 	return fmt.Sprintf("<t:%d:R>", t.Unix())
 }
 
-func monitorValidator(vm *ValidatorMonitor) (stats ValidatorStats, errs []error) {
+func monitorValidator(
+	vm *ValidatorMonitor,
+	stats *ValidatorStats,
+) (errs []error) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
 	client, err := getCosmosClient(vm.RPC, vm.ChainID)
@@ -182,44 +185,66 @@ func runMonitor(
 ) {
 	for {
 		stats := ValidatorStats{}
-		var errs []error
+		var valErrs []error
+		var sentryErrs []error
 
-		var rpcRetries int
-		if vm.RPCRetries != nil {
-			rpcRetries = *vm.RPCRetries
-		} else {
-			rpcRetries = rpcErrorRetries
-		}
-
-		for i := 0; i < rpcRetries; i++ {
-			stats, errs = monitorValidator(vm)
-			if errs == nil {
-				fmt.Printf("No errors found for validator: %s\n", vm.Name)
-				break
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			var rpcRetries int
+			if vm.RPCRetries != nil {
+				rpcRetries = *vm.RPCRetries
+			} else {
+				rpcRetries = rpcErrorRetries
 			}
-			fmt.Printf("Got validator errors: +%v\n", errs)
-			foundNonRPCError := false
-			for _, err := range errs {
-				if _, ok := err.(*GenericRPCError); !ok {
-					foundNonRPCError = true
+
+			for i := 0; i < rpcRetries; i++ {
+				valErrs = monitorValidator(vm, &stats)
+				if len(valErrs) == 0 {
+					fmt.Printf("No errors found for validator: %s\n", vm.Name)
 					break
 				}
+				fmt.Printf("Got validator errors: +%v\n", valErrs)
+				foundNonRPCError := false
+				for _, err := range valErrs {
+					if _, ok := err.(*GenericRPCError); !ok {
+						foundNonRPCError = true
+						break
+					}
+				}
+				if foundNonRPCError {
+					break
+				}
+				if i < rpcRetries-1 {
+					fmt.Println("Found only RPC errors, retrying")
+					time.Sleep(time.Duration((i*i)+1) * time.Second) // exponential backoff retry
+				}
+				// loop again up to n times if we are hitting only generic RPC errors
 			}
-			if foundNonRPCError {
-				break
-			}
-			if i < rpcRetries-1 {
-				fmt.Println("Found only RPC errors, retrying")
-				time.Sleep(time.Duration((i*i)+1) * time.Second) // exponential backoff retry
-			}
-			// loop again up to n times if we are hitting only generic RPC errors
-		}
+			wg.Done()
+		}()
 
 		if vm.Sentries != nil {
-			sentryErrs := monitorSentries(&stats, vm)
-			if sentryErrs != nil {
-				errs = append(errs, sentryErrs...)
-			}
+			wg.Add(1)
+			go func() {
+				sentryErrs = monitorSentries(&stats, vm)
+				if len(sentryErrs) == 0 {
+					fmt.Printf("No errors found for validator sentries: %s\n", vm.Name)
+				} else {
+					fmt.Printf("Got validator sentry errors: +%v\n", sentryErrs)
+				}
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+
+		errs := []error{}
+		if len(valErrs) > 0 {
+			errs = append(errs, valErrs...)
+		}
+		if len(sentryErrs) > 0 {
+			errs = append(errs, sentryErrs...)
 		}
 
 		stats.determineCurrentAlertLevel()
