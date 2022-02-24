@@ -44,8 +44,6 @@ func getColorForAlertLevel(alertLevel AlertLevel) int {
 }
 
 func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Embed {
-	color := getColorForAlertLevel(stats.AlertLevel)
-
 	var uptime string
 	if stats.SlashingPeriodUptime == 0 {
 		uptime = "N/A"
@@ -53,7 +51,11 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 		uptime = fmt.Sprintf("%.02f%%", stats.SlashingPeriodUptime)
 	}
 
+	title := fmt.Sprintf("%s (%s up)", vm.Name, uptime)
+
+	var description string
 	sentryString := ""
+
 	if vm.Sentries != nil {
 		for _, vmSentry := range *vm.Sentries {
 			sentryFound := false
@@ -78,19 +80,19 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	}
 
 	if stats.Height == stats.LastSignedBlockHeight {
-		return discord.Embed{
-			Title: fmt.Sprintf("%s (%s up)", vm.Name, uptime),
-			Description: fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nMost Recent Signed Blocks: **%d/%d**%s",
-				stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString),
-			Color: color,
-		}
+		description = fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nMost Recent Signed Blocks: **%d/%d**%s",
+			stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString)
+	} else {
+		description = fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nLast Signed Height: **%d**\nLast Signed Timestamp: **%s**\nMost Recent Signed Blocks: **%d/%d**%s",
+			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString)
 	}
 
+	color := getColorForAlertLevel(stats.AlertLevel)
+
 	return discord.Embed{
-		Title: fmt.Sprintf("%s (%s up)", vm.Name, uptime),
-		Description: fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nLast Signed Height: **%d**\nLast Signed Timestamp: **%s**\nMost Recent Signed Blocks: **%d/%d**%s",
-			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString),
-		Color: color,
+		Title:       title,
+		Description: description,
+		Color:       color,
 	}
 }
 
@@ -112,7 +114,7 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 		}
 	} else {
 		message, err := service.client.CreateMessage(discord.WebhookMessageCreate{
-			Username: config.Discord.Username,
+			Username: config.Notifications.Discord.Username,
 			Embeds: []discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
@@ -135,7 +137,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 	alertNotification *ValidatorAlertNotification,
 ) {
 	tagUser := ""
-	for _, userID := range config.Discord.AlertUserIDs {
+	for _, userID := range config.Notifications.Discord.AlertUserIDs {
 		tagUser += fmt.Sprintf("<@%s> ", userID)
 	}
 
@@ -157,7 +159,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 			toNotify = strings.Trim(tagUser, " ")
 		}
 		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
-			Username: config.Discord.Username,
+			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{
@@ -182,7 +184,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 			toNotify = strings.Trim(tagUser, " ")
 		}
 		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
-			Username: config.Discord.Username,
+			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
 			Embeds: []discord.Embed{
 				discord.Embed{

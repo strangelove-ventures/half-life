@@ -83,9 +83,14 @@ type ValidatorAlertNotification struct {
 	AlertLevel     AlertLevel
 }
 
+type NotificationsConfig struct {
+	Service string                `yaml:"service"`
+	Discord *DiscordChannelConfig `yaml:"discord"`
+}
+
 type HalfLifeConfig struct {
-	Discord    *DiscordChannelConfig
-	Validators []*ValidatorMonitor `yaml:"validators"`
+	Notifications *NotificationsConfig `yaml:"notifications"`
+	Validators    []*ValidatorMonitor  `yaml:"validators"`
 }
 
 type DiscordWebhookConfig struct {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -23,9 +24,27 @@ var monitorCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Error parsing config.yaml: %v", err)
 		}
+
+		if config.Notifications == nil {
+			panic("Notifications configuration is not present in config.yaml")
+		}
+
 		writeConfigMutex := sync.Mutex{}
 		// TODO implement more notification services e.g. slack, email
-		notificationService := NewDiscordNotificationService(config.Discord.Webhook.ID, config.Discord.Webhook.Token)
+		var notificationService NotificationService
+		switch config.Notifications.Service {
+		case "discord":
+			if config.Notifications.Discord == nil {
+				panic("Discord configuration not present in config.yaml")
+			}
+			notificationService = NewDiscordNotificationService(config.Notifications.Discord.Webhook.ID, config.Notifications.Discord.Webhook.Token)
+		default:
+			if config.Notifications.Service == "" {
+				panic("Notification service not configured in config.yaml")
+			}
+			panic(fmt.Sprintf("Notification service not supported: %s", config.Notifications.Service))
+		}
+
 		alertState := make(map[string]*ValidatorAlertState)
 		for i, vm := range config.Validators {
 			if i == len(config.Validators)-1 {
