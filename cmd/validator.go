@@ -369,7 +369,7 @@ func getAlertNotification(
 		case *SentryGRPCError:
 			sentryName := err.sentry
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
-			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
+			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
 				if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] >= sentryGRPCErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
