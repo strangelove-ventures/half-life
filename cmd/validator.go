@@ -369,9 +369,9 @@ func getAlertNotification(
 		case *SentryGRPCError:
 			sentryName := err.sentry
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
-			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 {
+			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
-				if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] > sentryGRPCErrorNotifyThreshold {
+				if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] >= sentryGRPCErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
@@ -381,9 +381,9 @@ func getAlertNotification(
 		case *SentryOutOfSyncError:
 			sentryName := err.sentry
 			foundSentryOutOfSyncErrors = append(foundSentryOutOfSyncErrors, sentryName)
-			if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 {
+			if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
 				addAlert(err)
-				if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] > sentryOutOfSyncErrorNotifyThreshold {
+				if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)

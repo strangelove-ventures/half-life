@@ -68,7 +68,20 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 						statusIcon = iconError
 					}
 
-					sentryString += fmt.Sprintf("\n%s **%s** - Height **%d** - Version **%s**", statusIcon, sentryStats.Name, sentryStats.Height, sentryStats.Version)
+					var height string
+					if sentryStats.Height == 0 {
+						height = "N/A"
+					} else {
+						height = fmt.Sprint(sentryStats.Height)
+					}
+					var version string
+					if sentryStats.Version == "" {
+						version = "N/A"
+					} else {
+						version = sentryStats.Version
+					}
+
+					sentryString += fmt.Sprintf("\n%s **%s** - Height **%s** - Version **%s**", statusIcon, sentryStats.Name, height, version)
 					sentryFound = true
 					break
 				}
