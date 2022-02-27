@@ -119,7 +119,7 @@ type ValidatorMonitor struct {
 	Sentries               *[]Sentry `yaml:"sentries"`
 }
 
-func saveConfig(config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {
+func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {
 	writeConfigMutex.Lock()
 	defer writeConfigMutex.Unlock()
 
@@ -128,7 +128,7 @@ func saveConfig(config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {
 		fmt.Printf("Error during config yaml marshal %v\n", err)
 	}
 
-	err = os.WriteFile(configFilePath, yamlBytes, 0644)
+	err = os.WriteFile(configFile, yamlBytes, 0644)
 	if err != nil {
 		fmt.Printf("Error saving config yaml %v\n", err)
 	}

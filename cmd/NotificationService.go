@@ -7,5 +7,5 @@ type NotificationService interface {
 	SendValidatorAlertNotification(config *HalfLifeConfig, vm *ValidatorMonitor, stats ValidatorStats, alertNotification *ValidatorAlertNotification)
 
 	// update (or create) realtime status for validator
-	UpdateValidatorRealtimeStatus(config *HalfLifeConfig, vm *ValidatorMonitor, stats ValidatorStats, writeConfigMutex *sync.Mutex)
+	UpdateValidatorRealtimeStatus(configFile string, config *HalfLifeConfig, vm *ValidatorMonitor, stats ValidatorStats, writeConfigMutex *sync.Mutex)
 }

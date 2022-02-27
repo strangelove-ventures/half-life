@@ -175,6 +175,7 @@ func monitorSentries(
 func runMonitor(
 	notificationService NotificationService,
 	alertState *map[string]*ValidatorAlertState,
+	configFile string,
 	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
 	writeConfigMutex *sync.Mutex,
@@ -260,7 +261,7 @@ func runMonitor(
 			notificationService.SendValidatorAlertNotification(config, vm, stats, notification)
 		}
 
-		notificationService.UpdateValidatorRealtimeStatus(config, vm, stats, writeConfigMutex)
+		notificationService.UpdateValidatorRealtimeStatus(configFile, config, vm, stats, writeConfigMutex)
 
 		time.Sleep(30 * time.Second)
 	}

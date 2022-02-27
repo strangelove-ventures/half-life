@@ -21,8 +21,15 @@ You can optionally provide the `sentries` array to also monitor the sentries via
 See [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for how to create a webhook for a discord channel.
 
 Begin monitoring with:
+
 ```bash
-halflife monitor
+half-life monitor
+```
+
+By default, `half-life monitor` will look for `config.yaml` in the current working directory. To specify a different config file path, use the `--file`/`-f` flag:
+
+```bash
+half-life monitor -f ~/config.yaml
 ```
 
 When a validator is first added to `config.yaml` and halflife is started, a status message will be created in the discord channel and the ID of that message will be added to `config.yaml`. Pin this message so that the channel's pinned messages can act as a dashboard to see the realtime status of the validators.
