@@ -111,6 +111,7 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 
 // implements NotificationService interface
 func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
+	configFile string,
 	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
 	stats ValidatorStats,
@@ -138,7 +139,7 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 		messageID := string(message.ID)
 		vm.DiscordStatusMessageID = &messageID
 		fmt.Printf("Saved message ID: %s\n", messageID)
-		saveConfig(config, writeConfigMutex)
+		saveConfig(configFile, config, writeConfigMutex)
 	}
 }
 

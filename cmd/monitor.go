@@ -15,7 +15,8 @@ var monitorCmd = &cobra.Command{
 	Short: "Daemon to monitor validators",
 	Long:  "Monitors validators and pushes alerts to Discord using the configuration in config.yaml",
 	Run: func(cmd *cobra.Command, args []string) {
-		dat, err := os.ReadFile(configFilePath)
+		configFile, _ := cmd.Flags().GetString("file")
+		dat, err := os.ReadFile(configFile)
 		if err != nil {
 			log.Fatalf("Error reading config.yaml: %v", err)
 		}
@@ -48,9 +49,9 @@ var monitorCmd = &cobra.Command{
 		alertState := make(map[string]*ValidatorAlertState)
 		for i, vm := range config.Validators {
 			if i == len(config.Validators)-1 {
-				runMonitor(notificationService, &alertState, &config, vm, &writeConfigMutex)
+				runMonitor(notificationService, &alertState, configFile, &config, vm, &writeConfigMutex)
 			} else {
-				go runMonitor(notificationService, &alertState, &config, vm, &writeConfigMutex)
+				go runMonitor(notificationService, &alertState, configFile, &config, vm, &writeConfigMutex)
 			}
 		}
 	},
@@ -58,4 +59,5 @@ var monitorCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(monitorCmd)
+	monitorCmd.Flags().StringP("file", "f", configFilePath, "File path to config yaml")
 }
