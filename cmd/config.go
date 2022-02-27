@@ -64,7 +64,7 @@ type ValidatorStats struct {
 	LastSignedBlockHeight    int64
 	LastSignedBlockTimestamp string
 	SlashingPeriodUptime     float64
-	SentryStats              []SentryStats
+	SentryStats              []*SentryStats
 	AlertLevel               AlertLevel
 }
 

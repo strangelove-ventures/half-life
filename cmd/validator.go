@@ -146,14 +146,10 @@ func monitorSentry(
 	} else {
 		sentryStats.Height = syncInfo.Block.Header.Height
 		sentryStats.Version = nodeInfo.ApplicationVersion.GetVersion()
-		if stats.Height-syncInfo.Block.Header.Height > outOfSyncThreshold {
-			errToAdd = newSentryOutOfSyncError(sentry.Name, fmt.Sprintf("Height: %d not in sync with RPC Height: %d", syncInfo.Block.Header.Height, stats.Height))
-			sentryStats.SentryAlertType = sentryAlertTypeOutOfSyncError
-		}
 	}
 	errsLock.Lock()
-	stats.SentryStats = append(stats.SentryStats, sentryStats)
-	if err != nil {
+	stats.SentryStats = append(stats.SentryStats, &sentryStats)
+	if errToAdd != nil {
 		*errs = append(*errs, errToAdd)
 	}
 	errsLock.Unlock()
@@ -245,6 +241,15 @@ func runMonitor(
 		}
 		if len(sentryErrs) > 0 {
 			errs = append(errs, sentryErrs...)
+		}
+
+		for _, sentryStat := range stats.SentryStats {
+			if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
+				if stats.Height-sentryStat.Height > outOfSyncThreshold {
+					errs = append(errs, newSentryOutOfSyncError(sentryStat.Name, fmt.Sprintf("Height: %d not in sync with RPC Height: %d", sentryStat.Height, stats.Height)))
+					sentryStat.SentryAlertType = sentryAlertTypeOutOfSyncError
+				}
+			}
 		}
 
 		stats.determineCurrentAlertLevel()
@@ -396,39 +401,50 @@ func getAlertNotification(
 		}
 	}
 
-	// iterate through all error types
-	for i := alertTypeJailed; i < alertTypeEnd; i++ {
-		alertTypeFound := false
-		for _, alertType := range foundAlertTypes {
-			if i == alertType {
-				alertTypeFound = true
-				break
+	hasAlertType := func(alertType AlertType) bool {
+		for _, at := range foundAlertTypes {
+			if at == alertType {
+				return true
 			}
 		}
-		// reset alert type if we didn't see it this time
-		if !alertTypeFound && (*alertState)[vm.Name].AlertTypeCounts[i] > 0 {
+		return false
+	}
+
+	isRPCError := func(alertType AlertType) bool {
+		return alertType == alertTypeGenericRPC || alertType == alertTypeOutOfSync
+	}
+	foundRPCError := hasAlertType(alertTypeOutOfSync) || hasAlertType(alertTypeGenericRPC)
+
+	// iterate through all error types
+	for i := alertTypeJailed; i < alertTypeEnd; i++ {
+		// reset alert type if we didn't see it this time and it's either an RPC error or there are no RPC errors
+		// should only clear jailed, tombstoned, and missed recent blocks errors if there also isn't a generic RPC error or RPC server out of sync error
+		if !hasAlertType(i) && (*alertState)[vm.Name].AlertTypeCounts[i] > 0 {
 			(*alertState)[vm.Name].AlertTypeCounts[i] = 0
-			switch i {
-			case alertTypeJailed:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "jailed")
-				alertNotification.NotifyForClear = true
-			case alertTypeTombstoned:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "tombstoned")
-				alertNotification.NotifyForClear = true
-			case alertTypeOutOfSync:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc server out of sync")
-			case alertTypeBlockFetch:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc block fetch error")
-			case alertTypeMissedRecentBlocks:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "missed recent blocks")
-				if (*alertState)[vm.Name].RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
+			if isRPCError(i) || !foundRPCError {
+				(*alertState)[vm.Name].AlertTypeCounts[i] = 0
+				switch i {
+				case alertTypeOutOfSync:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc server out of sync")
+				case alertTypeGenericRPC:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "generic rpc error")
+				case alertTypeJailed:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "jailed")
 					alertNotification.NotifyForClear = true
+				case alertTypeTombstoned:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "tombstoned")
+					alertNotification.NotifyForClear = true
+				case alertTypeBlockFetch:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc block fetch error")
+				case alertTypeMissedRecentBlocks:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "missed recent blocks")
+					if (*alertState)[vm.Name].RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
+						alertNotification.NotifyForClear = true
+					}
+					(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
+					(*alertState)[vm.Name].RecentMissedBlocksCounterMax = 0
+				default:
 				}
-				(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
-				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = 0
-			case alertTypeGenericRPC:
-				alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "generic rpc error")
-			default:
 			}
 		}
 	}
