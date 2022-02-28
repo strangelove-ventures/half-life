@@ -16,10 +16,6 @@ const (
 	outOfSyncThreshold = 5
 )
 
-func formattedTime(t time.Time) string {
-	return fmt.Sprintf("<t:%d:R>", t.Unix())
-}
-
 func monitorValidator(
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
@@ -70,7 +66,7 @@ func monitorValidator(
 			errs = append(errs, newOutOfSyncError(vm.RPC))
 		}
 		stats.Height = status.SyncInfo.LatestBlockHeight
-		stats.Timestamp = formattedTime(status.SyncInfo.LatestBlockTime)
+		stats.Timestamp = status.SyncInfo.LatestBlockTime
 		stats.RecentMissedBlocks = 0
 		for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
 			block, err := node.Block(context.Background(), &i)
@@ -87,7 +83,7 @@ func monitorValidator(
 				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 					if block.Block.Height > stats.LastSignedBlockHeight {
 						stats.LastSignedBlockHeight = block.Block.Height
-						stats.LastSignedBlockTimestamp = formattedTime(block.Block.Time)
+						stats.LastSignedBlockTimestamp = block.Block.Time
 					}
 					found = true
 					break
@@ -114,7 +110,7 @@ func monitorValidator(
 					for _, voter := range block.Block.LastCommit.Signatures {
 						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 							stats.LastSignedBlockHeight = block.Block.Height
-							stats.LastSignedBlockTimestamp = formattedTime(block.Block.Time)
+							stats.LastSignedBlockTimestamp = block.Block.Time
 							break
 						}
 					}
@@ -244,16 +240,10 @@ func runMonitor(
 			errs = append(errs, sentryErrs...)
 		}
 
-		for _, sentryStat := range stats.SentryStats {
-			if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
-				if stats.Height-sentryStat.Height > outOfSyncThreshold {
-					errs = append(errs, newSentryOutOfSyncError(sentryStat.Name, fmt.Sprintf("Height: %d not in sync with RPC Height: %d", sentryStat.Height, stats.Height)))
-					sentryStat.SentryAlertType = sentryAlertTypeOutOfSyncError
-				}
-			}
+		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel()
+		if len(aggregatedErrs) > 0 {
+			errs = append(errs, aggregatedErrs...)
 		}
-
-		stats.determineCurrentAlertLevel()
 
 		notification := getAlertNotification(vm, stats, alertState, errs)
 
@@ -267,20 +257,41 @@ func runMonitor(
 	}
 }
 
-func (stats *ValidatorStats) determineCurrentAlertLevel() {
+func (stats *ValidatorStats) increaseAlertLevel(alertLevel AlertLevel) {
+	if stats.AlertLevel < alertLevel {
+		stats.AlertLevel = alertLevel
+	}
+}
+
+// determine alert level and any additional errors now that RPC And sentry checks are complete
+func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []error) {
+	for _, sentryStat := range stats.SentryStats {
+		if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
+			if stats.Height-sentryStat.Height > outOfSyncThreshold {
+				errs = append(errs, newSentryOutOfSyncError(sentryStat.Name, fmt.Sprintf("Height: %d not in sync with RPC Height: %d", sentryStat.Height, stats.Height)))
+				sentryStat.SentryAlertType = sentryAlertTypeOutOfSyncError
+			}
+		}
+		if stats.Height < sentryStat.Height-outOfSyncThreshold {
+			// RPC server is behind sentries
+			stats.RPCError = true
+			stats.increaseAlertLevel(alertLevelWarning)
+		}
+	}
+
 	if stats.Height == stats.LastSignedBlockHeight {
 		if stats.RecentMissedBlocks == 0 {
 			if stats.SlashingPeriodUptime > slashingPeriodUptimeWarningThreshold {
-				stats.AlertLevel = alertLevelNone
+				// no recent missed blocks and above warning threshold for slashing period uptime, all good
 				return
 			} else {
 				// Warning for recovering from downtime. Not error because we are currently signing
-				stats.AlertLevel = alertLevelWarning
+				stats.increaseAlertLevel(alertLevelWarning)
 				return
 			}
 		} else {
 			// Warning for missing recent blocks, but have signed current block
-			stats.AlertLevel = alertLevelWarning
+			stats.increaseAlertLevel(alertLevelWarning)
 			return
 		}
 	}
@@ -290,15 +301,16 @@ func (stats *ValidatorStats) determineCurrentAlertLevel() {
 	if stats.RecentMissedBlocks < recentBlocksToCheck {
 		// we have missed some, but not all, of the recent blocks to check
 		if stats.SlashingPeriodUptime > slashingPeriodUptimeErrorThreshold {
-			stats.AlertLevel = alertLevelWarning
+			stats.increaseAlertLevel(alertLevelWarning)
 		} else {
 			// we are below slashing period uptime error threshold
-			stats.AlertLevel = alertLevelHigh
+			stats.increaseAlertLevel(alertLevelHigh)
 		}
 	} else {
 		// Error, missed all of the recent blocks to check
-		stats.AlertLevel = alertLevelHigh
+		stats.increaseAlertLevel(alertLevelHigh)
 	}
+	return
 }
 
 func getAlertNotification(
@@ -351,20 +363,27 @@ func getAlertNotification(
 			handleGenericAlert(err, alertTypeTombstoned, alertLevelCritical)
 		case *OutOfSyncError:
 			handleGenericAlert(err, alertTypeOutOfSync, alertLevelWarning)
+			stats.RPCError = true
 		case *BlockFetchError:
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
 		case *MissedRecentBlocksError:
-			if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
-				addAlert(err)
-				if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
-					if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
-						setAlertLevel(alertLevelHigh)
-					} else {
-						setAlertLevel(alertLevelWarning)
-					}
-				} else {
-					setAlertLevel(alertLevelWarning)
+			addRecentMissedBlocksAlertIfNecessary := func(alertLevel AlertLevel) {
+				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
+					addAlert(err)
+					setAlertLevel(alertLevel)
 				}
+			}
+			if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
+				if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
+					stats.RecentMissedBlockAlertLevel = alertLevelHigh
+					addRecentMissedBlocksAlertIfNecessary(alertLevelHigh)
+				} else {
+					stats.RecentMissedBlockAlertLevel = alertLevelWarning
+					addRecentMissedBlocksAlertIfNecessary(alertLevelWarning)
+				}
+			} else {
+				stats.RecentMissedBlockAlertLevel = alertLevelWarning
+				addRecentMissedBlocksAlertIfNecessary(alertLevelWarning)
 			}
 			(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
 			if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounterMax {
@@ -372,6 +391,7 @@ func getAlertNotification(
 			}
 		case *GenericRPCError:
 			handleGenericAlert(err, alertTypeGenericRPC, alertLevelWarning)
+			stats.RPCError = true
 		case *SentryGRPCError:
 			sentryName := err.sentry
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DisgoOrg/disgo/discord"
 	"github.com/DisgoOrg/disgo/webhook"
@@ -16,12 +17,17 @@ const (
 	colorError    = 0xFF0000
 	colorCritical = 0x964B00
 
-	iconGood  = "🟢" // green circle
-	iconError = "🔴" // red circle
+	iconGood    = "🟢" // green circle
+	iconWarning = "🟡" // yellow circle
+	iconError   = "🔴" // red circle
 )
 
 type DiscordNotificationService struct {
 	client *webhook.Client
+}
+
+func formattedTime(t time.Time) string {
+	return fmt.Sprintf("<t:%d:R>", t.Unix())
 }
 
 func NewDiscordNotificationService(webhookID, webhookToken string) *DiscordNotificationService {
@@ -48,10 +54,10 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	if stats.SlashingPeriodUptime == 0 {
 		uptime = "N/A"
 	} else {
-		uptime = fmt.Sprintf("%.02f%%", stats.SlashingPeriodUptime)
+		uptime = fmt.Sprintf("%.02f", stats.SlashingPeriodUptime)
 	}
 
-	title := fmt.Sprintf("%s (%s up)", vm.Name, uptime)
+	title := fmt.Sprintf("%s (%s%% up)", vm.Name, uptime)
 
 	var description string
 	sentryString := ""
@@ -92,12 +98,43 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 		}
 	}
 
-	if stats.Height == stats.LastSignedBlockHeight {
-		description = fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nMost Recent Signed Blocks: **%d/%d**%s",
-			stats.Timestamp, stats.Height, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString)
+	recentSignedBlocks := fmt.Sprintf("%s Latest Blocks Signed: **N/A**", iconWarning)
+
+	var latestBlock string
+	if stats.Timestamp.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		latestBlock = fmt.Sprintf("%s Height **N/A**", iconError)
 	} else {
-		description = fmt.Sprintf("Latest Timestamp: **%s**\nLatest Height: **%d**\nLast Signed Height: **%d**\nLast Signed Timestamp: **%s**\nMost Recent Signed Blocks: **%d/%d**%s",
-			stats.Timestamp, stats.Height, stats.LastSignedBlockHeight, stats.LastSignedBlockTimestamp, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck, sentryString)
+		var rpcStatusIcon string
+		if stats.RPCError {
+			rpcStatusIcon = iconError
+		} else {
+			rpcStatusIcon = iconGood
+			var recentSignedBlocksIcon string
+			if stats.RecentMissedBlockAlertLevel >= alertLevelHigh {
+				recentSignedBlocksIcon = iconError
+			} else if stats.RecentMissedBlockAlertLevel == alertLevelWarning {
+				recentSignedBlocksIcon = iconWarning
+			} else {
+				recentSignedBlocksIcon = iconGood
+			}
+			recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck)
+
+		}
+		latestBlock = fmt.Sprintf("%s Height **%s** - **%s**", rpcStatusIcon, fmt.Sprint(stats.Height), formattedTime(stats.Timestamp))
+	}
+
+	if stats.Height == stats.LastSignedBlockHeight {
+		description = fmt.Sprintf("%s\n%s%s",
+			latestBlock, recentSignedBlocks, sentryString)
+	} else {
+		var lastSignedBlock string
+		if stats.LastSignedBlockHeight == -1 {
+			lastSignedBlock = fmt.Sprintf("%s Last Signed **N/A**", iconError)
+		} else {
+			lastSignedBlock = fmt.Sprintf("%s Last Signed **%s** - **%s**", iconError, fmt.Sprint(stats.LastSignedBlockHeight), formattedTime(stats.LastSignedBlockTimestamp))
+		}
+		description = fmt.Sprintf("%s\n%s\n%s%s",
+			latestBlock, lastSignedBlock, recentSignedBlocks, sentryString)
 	}
 
 	color := getColorForAlertLevel(stats.AlertLevel)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -58,14 +59,16 @@ type SentryStats struct {
 }
 
 type ValidatorStats struct {
-	Timestamp                string
-	Height                   int64
-	RecentMissedBlocks       int64
-	LastSignedBlockHeight    int64
-	LastSignedBlockTimestamp string
-	SlashingPeriodUptime     float64
-	SentryStats              []*SentryStats
-	AlertLevel               AlertLevel
+	Timestamp                   time.Time
+	Height                      int64
+	RecentMissedBlocks          int64
+	LastSignedBlockHeight       int64
+	RecentMissedBlockAlertLevel AlertLevel
+	LastSignedBlockTimestamp    time.Time
+	SlashingPeriodUptime        float64
+	SentryStats                 []*SentryStats
+	AlertLevel                  AlertLevel
+	RPCError                    bool
 }
 
 type ValidatorAlertState struct {
