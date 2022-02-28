@@ -265,6 +265,7 @@ func (stats *ValidatorStats) increaseAlertLevel(alertLevel AlertLevel) {
 
 // determine alert level and any additional errors now that RPC And sentry checks are complete
 func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []error) {
+	sentryErrorCount := 0
 	for _, sentryStat := range stats.SentryStats {
 		if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
 			if stats.Height-sentryStat.Height > outOfSyncThreshold {
@@ -272,11 +273,20 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 				sentryStat.SentryAlertType = sentryAlertTypeOutOfSyncError
 			}
 		}
+		if sentryStat.SentryAlertType != sentryAlertTypeNone {
+			// warning for error on single sentry
+			stats.increaseAlertLevel(alertLevelWarning)
+			sentryErrorCount++
+		}
 		if stats.Height < sentryStat.Height-outOfSyncThreshold {
 			// RPC server is behind sentries
 			stats.RPCError = true
 			stats.increaseAlertLevel(alertLevelWarning)
 		}
+	}
+	// If all sentries have errors, set overall alert level to high
+	if sentryErrorCount == len(stats.SentryStats) {
+		stats.increaseAlertLevel(alertLevelHigh)
 	}
 
 	if stats.Height == stats.LastSignedBlockHeight {
