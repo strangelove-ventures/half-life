@@ -7,6 +7,7 @@ Monitors and alerts for scenarios such as:
 - Recent missed blocks (is the validator signing currently)
 - Jailed status
 - Tombstoned status
+- Individual sentry nodes unreachable/out of sync
 
 Discord messages are created in the configured webhook channel for:
 - Current validator status
@@ -34,7 +35,7 @@ half-life monitor -f ~/config.yaml
 
 When a validator is first added to `config.yaml` and halflife is started, a status message will be created in the discord channel and the ID of that message will be added to `config.yaml`. Pin this message so that the channel's pinned messages can act as a dashboard to see the realtime status of the validators.
 
-![Screenshot from 2022-02-23 13-34-27](https://user-images.githubusercontent.com/6722152/155403834-d20952b3-b657-4264-8258-d882381f456c.png)
+![Screenshot from 2022-02-28 14-29-36](https://user-images.githubusercontent.com/6722152/156061805-330d1c76-acfa-4089-b327-f35f686fa0e7.png)
 
 Alerts will be posted when any error conditions are detected, and follow up messages will be posted when those errors are cleared.
 
