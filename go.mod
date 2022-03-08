@@ -1,4 +1,4 @@
-module halflife
+module github.com/strangelove-ventures/halflife
 
 go 1.17
 
