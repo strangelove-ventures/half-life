@@ -16,6 +16,7 @@ import (
 
 const (
 	sentryGRPCTimeoutSeconds = 5
+	RPCTimeoutSeconds        = 5
 )
 
 func newClient(addr string) (rpcclient.Client, error) {
@@ -48,11 +49,15 @@ func getCosmosClient(rpcAddress string, chainID string) (*cosmosClient.Context, 
 }
 
 func getSlashingInfo(client *cosmosClient.Context) (*slashingtypes.QueryParamsResponse, error) {
-	return slashingtypes.NewQueryClient(client).Params(context.Background(), &slashingtypes.QueryParamsRequest{})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+	defer cancel()
+	return slashingtypes.NewQueryClient(client).Params(ctx, &slashingtypes.QueryParamsRequest{})
 }
 
 func getSigningInfo(client *cosmosClient.Context, address string) (*slashingtypes.QuerySigningInfoResponse, error) {
-	return slashingtypes.NewQueryClient(client).SigningInfo(context.Background(), &slashingtypes.QuerySigningInfoRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+	defer cancel()
+	return slashingtypes.NewQueryClient(client).SigningInfo(ctx, &slashingtypes.QuerySigningInfoRequest{
 		ConsAddress: address,
 	})
 }
@@ -70,7 +75,7 @@ func getSentryInfo(grpcAddr string) (*tmservice.GetNodeInfoResponse, *tmservice.
 	if err != nil {
 		return nil, nil, err
 	}
-	syncingInfo, err := serviceClient.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
+	syncingInfo, err := serviceClient.GetLatestBlock(ctx, &tmservice.GetLatestBlockRequest{})
 	if err != nil {
 		return nil, nil, err
 	}

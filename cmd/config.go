@@ -77,6 +77,8 @@ type ValidatorAlertState struct {
 	SentryOutOfSyncErrorCounts   map[string]int64
 	RecentMissedBlocksCounter    int64
 	RecentMissedBlocksCounterMax int64
+	LatestBlockChecked           int64
+	LatestBlockSigned            int64
 }
 
 type ValidatorAlertNotification struct {

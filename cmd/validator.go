@@ -19,6 +19,7 @@ const (
 func monitorValidator(
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
+	alertState *ValidatorAlertState,
 ) (errs []error) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
@@ -58,7 +59,9 @@ func monitorValidator(
 		errs = append(errs, newGenericRPCError(err.Error()))
 		return
 	}
-	status, err := node.Status(context.Background())
+	statusCtx, statusCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+	status, err := node.Status(statusCtx)
+	statusCtxCancel()
 	if err != nil {
 		errs = append(errs, newGenericRPCError(err.Error()))
 	} else {
@@ -69,7 +72,9 @@ func monitorValidator(
 		stats.Timestamp = status.SyncInfo.LatestBlockTime
 		stats.RecentMissedBlocks = 0
 		for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
-			block, err := node.Block(context.Background(), &i)
+			blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+			block, err := node.Block(blockCtx, &i)
+			blockCtxCancel()
 			if err != nil {
 				// generic RPC error for this one so it will be included in the generic RPC error retry
 				errs = append(errs, newGenericRPCError(newBlockFetchError(i, vm.RPC).Error()))
@@ -98,8 +103,11 @@ func monitorValidator(
 			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
+
 				for i := stats.Height - recentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod) && i > 0; i-- {
-					block, err := node.Block(context.Background(), &i)
+					blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+					block, err := node.Block(blockCtx, &i)
+					blockCtxCancel()
 					if err != nil {
 						errs = append(errs, newBlockFetchError(i, vm.RPC))
 						break
@@ -170,7 +178,7 @@ func monitorSentries(
 
 func runMonitor(
 	notificationService NotificationService,
-	alertState *map[string]*ValidatorAlertState,
+	alertState *ValidatorAlertState,
 	configFile string,
 	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
@@ -192,7 +200,7 @@ func runMonitor(
 			}
 
 			for i := 0; i < rpcRetries; i++ {
-				valErrs = monitorValidator(vm, &stats)
+				valErrs = monitorValidator(vm, &stats, alertState)
 				if len(valErrs) == 0 {
 					fmt.Printf("No errors found for validator: %s\n", vm.Name)
 					break
@@ -326,16 +334,9 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 func getAlertNotification(
 	vm *ValidatorMonitor,
 	stats ValidatorStats,
-	alertState *map[string]*ValidatorAlertState,
+	alertState *ValidatorAlertState,
 	errs []error,
 ) *ValidatorAlertNotification {
-	if (*alertState)[vm.Name] == nil {
-		(*alertState)[vm.Name] = &ValidatorAlertState{
-			AlertTypeCounts:            make(map[AlertType]int64),
-			SentryGRPCErrorCounts:      make(map[string]int64),
-			SentryOutOfSyncErrorCounts: make(map[string]int64),
-		}
-	}
 	var foundAlertTypes []AlertType
 	var foundSentryGRPCErrors []string
 	var foundSentryOutOfSyncErrors []string
@@ -353,8 +354,8 @@ func getAlertNotification(
 
 	shouldNotifyForFoundAlertType := func(alertType AlertType) bool {
 		foundAlertTypes = append(foundAlertTypes, alertType)
-		shouldNotify := (*alertState)[vm.Name].AlertTypeCounts[alertType]%notifyEvery == 0
-		(*alertState)[vm.Name].AlertTypeCounts[alertType]++
+		shouldNotify := alertState.AlertTypeCounts[alertType]%notifyEvery == 0
+		alertState.AlertTypeCounts[alertType]++
 		return shouldNotify
 	}
 
@@ -378,12 +379,12 @@ func getAlertNotification(
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
 		case *MissedRecentBlocksError:
 			addRecentMissedBlocksAlertIfNecessary := func(alertLevel AlertLevel) {
-				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != (*alertState)[vm.Name].RecentMissedBlocksCounter {
+				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != alertState.RecentMissedBlocksCounter {
 					addAlert(err)
 					setAlertLevel(alertLevel)
 				}
 			}
-			if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounter {
+			if stats.RecentMissedBlocks > alertState.RecentMissedBlocksCounter {
 				if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
 					stats.RecentMissedBlockAlertLevel = alertLevelHigh
 					addRecentMissedBlocksAlertIfNecessary(alertLevelHigh)
@@ -395,9 +396,9 @@ func getAlertNotification(
 				stats.RecentMissedBlockAlertLevel = alertLevelWarning
 				addRecentMissedBlocksAlertIfNecessary(alertLevelWarning)
 			}
-			(*alertState)[vm.Name].RecentMissedBlocksCounter = stats.RecentMissedBlocks
-			if stats.RecentMissedBlocks > (*alertState)[vm.Name].RecentMissedBlocksCounterMax {
-				(*alertState)[vm.Name].RecentMissedBlocksCounterMax = stats.RecentMissedBlocks
+			alertState.RecentMissedBlocksCounter = stats.RecentMissedBlocks
+			if stats.RecentMissedBlocks > alertState.RecentMissedBlocksCounterMax {
+				alertState.RecentMissedBlocksCounterMax = stats.RecentMissedBlocks
 			}
 		case *GenericRPCError:
 			handleGenericAlert(err, alertTypeGenericRPC, alertLevelWarning)
@@ -405,27 +406,27 @@ func getAlertNotification(
 		case *SentryGRPCError:
 			sentryName := err.sentry
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
-			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
+			if alertState.SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
-				if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] >= sentryGRPCErrorNotifyThreshold {
+				if alertState.SentryGRPCErrorCounts[sentryName] >= sentryGRPCErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
 				}
 			}
-			(*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName]++
+			alertState.SentryGRPCErrorCounts[sentryName]++
 		case *SentryOutOfSyncError:
 			sentryName := err.sentry
 			foundSentryOutOfSyncErrors = append(foundSentryOutOfSyncErrors, sentryName)
-			if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 || (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
+			if alertState.SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
 				addAlert(err)
-				if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncErrorNotifyThreshold {
+				if alertState.SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
 				}
 			}
-			(*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName]++
+			alertState.SentryOutOfSyncErrorCounts[sentryName]++
 		default:
 			addAlert(err)
 			setAlertLevel(alertLevelWarning)
@@ -450,10 +451,10 @@ func getAlertNotification(
 	for i := alertTypeJailed; i < alertTypeEnd; i++ {
 		// reset alert type if we didn't see it this time and it's either an RPC error or there are no RPC errors
 		// should only clear jailed, tombstoned, and missed recent blocks errors if there also isn't a generic RPC error or RPC server out of sync error
-		if !hasAlertType(i) && (*alertState)[vm.Name].AlertTypeCounts[i] > 0 {
-			(*alertState)[vm.Name].AlertTypeCounts[i] = 0
+		if !hasAlertType(i) && alertState.AlertTypeCounts[i] > 0 {
+			alertState.AlertTypeCounts[i] = 0
 			if isRPCError(i) || !foundRPCError {
-				(*alertState)[vm.Name].AlertTypeCounts[i] = 0
+				alertState.AlertTypeCounts[i] = 0
 				switch i {
 				case alertTypeOutOfSync:
 					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc server out of sync")
@@ -469,17 +470,17 @@ func getAlertNotification(
 					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc block fetch error")
 				case alertTypeMissedRecentBlocks:
 					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "missed recent blocks")
-					if (*alertState)[vm.Name].RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
+					if alertState.RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
 						alertNotification.NotifyForClear = true
 					}
-					(*alertState)[vm.Name].RecentMissedBlocksCounter = 0
-					(*alertState)[vm.Name].RecentMissedBlocksCounterMax = 0
+					alertState.RecentMissedBlocksCounter = 0
+					alertState.RecentMissedBlocksCounterMax = 0
 				default:
 				}
 			}
 		}
 	}
-	for sentryName := range (*alertState)[vm.Name].SentryGRPCErrorCounts {
+	for sentryName := range alertState.SentryGRPCErrorCounts {
 		sentryFound := false
 		for _, foundSentryName := range foundSentryGRPCErrors {
 			if foundSentryName == sentryName {
@@ -487,15 +488,15 @@ func getAlertNotification(
 				break
 			}
 		}
-		if !sentryFound && (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] > 0 {
-			if (*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] > sentryGRPCErrorNotifyThreshold {
+		if !sentryFound && alertState.SentryGRPCErrorCounts[sentryName] > 0 {
+			if alertState.SentryGRPCErrorCounts[sentryName] > sentryGRPCErrorNotifyThreshold {
 				alertNotification.NotifyForClear = true
 			}
-			(*alertState)[vm.Name].SentryGRPCErrorCounts[sentryName] = 0
+			alertState.SentryGRPCErrorCounts[sentryName] = 0
 			alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, fmt.Sprintf("%s grpc error", sentryName))
 		}
 	}
-	for sentryName := range (*alertState)[vm.Name].SentryOutOfSyncErrorCounts {
+	for sentryName := range alertState.SentryOutOfSyncErrorCounts {
 		sentryHasOutOfSyncError := false
 		for _, foundSentryName := range foundSentryOutOfSyncErrors {
 			if foundSentryName == sentryName {
@@ -511,11 +512,11 @@ func getAlertNotification(
 				break
 			}
 		}
-		if !sentryHasOutOfSyncError && !sentryHasGRPCError && (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] > 0 {
-			if (*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] > sentryOutOfSyncErrorNotifyThreshold {
+		if !sentryHasOutOfSyncError && !sentryHasGRPCError && alertState.SentryOutOfSyncErrorCounts[sentryName] > 0 {
+			if alertState.SentryOutOfSyncErrorCounts[sentryName] > sentryOutOfSyncErrorNotifyThreshold {
 				alertNotification.NotifyForClear = true
 			}
-			(*alertState)[vm.Name].SentryOutOfSyncErrorCounts[sentryName] = 0
+			alertState.SentryOutOfSyncErrorCounts[sentryName] = 0
 			alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, fmt.Sprintf("%s out of sync error", sentryName))
 		}
 	}

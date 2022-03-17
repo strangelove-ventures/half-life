@@ -48,10 +48,15 @@ var monitorCmd = &cobra.Command{
 
 		alertState := make(map[string]*ValidatorAlertState)
 		for i, vm := range config.Validators {
+			alertState[vm.Name] = &ValidatorAlertState{
+				AlertTypeCounts:            make(map[AlertType]int64),
+				SentryGRPCErrorCounts:      make(map[string]int64),
+				SentryOutOfSyncErrorCounts: make(map[string]int64),
+			}
 			if i == len(config.Validators)-1 {
-				runMonitor(notificationService, &alertState, configFile, &config, vm, &writeConfigMutex)
+				runMonitor(notificationService, alertState[vm.Name], configFile, &config, vm, &writeConfigMutex)
 			} else {
-				go runMonitor(notificationService, &alertState, configFile, &config, vm, &writeConfigMutex)
+				go runMonitor(notificationService, alertState[vm.Name], configFile, &config, vm, &writeConfigMutex)
 			}
 		}
 	},
