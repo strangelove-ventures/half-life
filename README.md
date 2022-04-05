@@ -8,6 +8,7 @@ Monitors and alerts for scenarios such as:
 - Jailed status
 - Tombstoned status
 - Individual sentry nodes unreachable/out of sync
+- Chain halted
 
 Discord messages are created in the configured webhook channel for:
 - Current validator status

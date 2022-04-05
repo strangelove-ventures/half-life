@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	rpcErrorRetries    = 5
-	outOfSyncThreshold = 5
+	rpcErrorRetries          = 5
+	outOfSyncThreshold       = 5
+	haltThresholdNanoseconds = 3e11 // if nodes are stuck for > 5 minutes, will be considered halt
 )
 
 func monitorValidator(
@@ -67,6 +68,11 @@ func monitorValidator(
 	} else {
 		if status.SyncInfo.CatchingUp {
 			errs = append(errs, newOutOfSyncError(vm.RPC))
+		} else {
+			timeSinceLastBlock := time.Now().UnixNano() - status.SyncInfo.LatestBlockTime.UnixNano()
+			if timeSinceLastBlock > haltThresholdNanoseconds {
+				errs = append(errs, newChainHaltError(timeSinceLastBlock))
+			}
 		}
 		stats.Height = status.SyncInfo.LatestBlockHeight
 		stats.Timestamp = status.SyncInfo.LatestBlockTime
@@ -140,22 +146,30 @@ func monitorSentry(
 	sentry Sentry,
 	stats *ValidatorStats,
 	vm *ValidatorMonitor,
+	alertState *ValidatorAlertState,
 ) {
 	nodeInfo, syncInfo, err := getSentryInfo(sentry.GRPC)
-	var errToAdd error
+	var errsToAdd []error
 	sentryStats := SentryStats{Name: sentry.Name, SentryAlertType: sentryAlertTypeNone}
 	if err != nil {
-		errToAdd = newSentryGRPCError(sentry.Name, err.Error())
+		errsToAdd = append(errsToAdd, newSentryGRPCError(sentry.Name, err.Error()))
 		sentryStats.SentryAlertType = sentryAlertTypeGRPCError
 	} else {
 		sentryStats.Height = syncInfo.Block.Header.Height
 		sentryStats.Version = nodeInfo.ApplicationVersion.GetVersion()
+		blockDelta := syncInfo.Block.Header.Height - alertState.SentryLatestHeight[sentry.Name]
+		if blockDelta == 0 {
+			timeSinceLastBlock := time.Now().UnixNano() - syncInfo.Block.Header.Time.UnixNano()
+			if timeSinceLastBlock > haltThresholdNanoseconds {
+				errsToAdd = append(errsToAdd, newSentryHaltError(sentry.Name, timeSinceLastBlock))
+				sentryStats.SentryAlertType = sentryAlertTypeHalt
+			}
+		}
+		alertState.SentryLatestHeight[sentry.Name] = syncInfo.Block.Header.Height
 	}
 	errsLock.Lock()
 	stats.SentryStats = append(stats.SentryStats, &sentryStats)
-	if errToAdd != nil {
-		*errs = append(*errs, errToAdd)
-	}
+	*errs = append(*errs, errsToAdd...)
 	errsLock.Unlock()
 	wg.Done()
 }
@@ -163,6 +177,7 @@ func monitorSentry(
 func monitorSentries(
 	stats *ValidatorStats,
 	vm *ValidatorMonitor,
+	alertState *ValidatorAlertState,
 ) []error {
 	errs := make([]error, 0)
 	wg := sync.WaitGroup{}
@@ -170,7 +185,7 @@ func monitorSentries(
 	sentries := *vm.Sentries
 	wg.Add(len(sentries))
 	for _, sentry := range sentries {
-		go monitorSentry(&wg, &errs, &errsLock, sentry, stats, vm)
+		go monitorSentry(&wg, &errs, &errsLock, sentry, stats, vm, alertState)
 	}
 	wg.Wait()
 	return errs
@@ -228,7 +243,7 @@ func runMonitor(
 		if vm.Sentries != nil {
 			wg.Add(1)
 			go func() {
-				sentryErrs = monitorSentries(&stats, vm)
+				sentryErrs = monitorSentries(&stats, vm, alertState)
 				if len(sentryErrs) == 0 {
 					fmt.Printf("No errors found for validator sentries: %s\n", vm.Name)
 				} else {
@@ -253,7 +268,7 @@ func runMonitor(
 			errs = append(errs, aggregatedErrs...)
 		}
 
-		notification := getAlertNotification(vm, stats, alertState, errs)
+		notification := getAlertNotification(vm, &stats, alertState, errs)
 
 		if notification != nil {
 			notificationService.SendValidatorAlertNotification(config, vm, stats, notification)
@@ -292,6 +307,7 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 			stats.increaseAlertLevel(alertLevelWarning)
 		}
 	}
+
 	// If all sentries have errors, set overall alert level to high
 	if sentryErrorCount == len(stats.SentryStats) {
 		stats.increaseAlertLevel(alertLevelHigh)
@@ -333,13 +349,14 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 
 func getAlertNotification(
 	vm *ValidatorMonitor,
-	stats ValidatorStats,
+	stats *ValidatorStats,
 	alertState *ValidatorAlertState,
 	errs []error,
 ) *ValidatorAlertNotification {
 	var foundAlertTypes []AlertType
 	var foundSentryGRPCErrors []string
 	var foundSentryOutOfSyncErrors []string
+	var foundSentryHaltErrors []string
 	alertNotification := ValidatorAlertNotification{AlertLevel: alertLevelNone}
 
 	setAlertLevel := func(al AlertLevel) {
@@ -374,6 +391,10 @@ func getAlertNotification(
 			handleGenericAlert(err, alertTypeTombstoned, alertLevelCritical)
 		case *OutOfSyncError:
 			handleGenericAlert(err, alertTypeOutOfSync, alertLevelWarning)
+			stats.RPCError = true
+		case *ChainHaltError:
+			fmt.Printf("found chain halt error\n")
+			handleGenericAlert(err, alertTypeHalt, alertLevelWarning)
 			stats.RPCError = true
 		case *BlockFetchError:
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
@@ -427,6 +448,18 @@ func getAlertNotification(
 				}
 			}
 			alertState.SentryOutOfSyncErrorCounts[sentryName]++
+		case *SentryHaltError:
+			sentryName := err.sentry
+			foundSentryHaltErrors = append(foundSentryHaltErrors, sentryName)
+			if alertState.SentryHaltErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryHaltErrorCounts[sentryName] == sentryHaltErrorNotifyThreshold {
+				addAlert(err)
+				if alertState.SentryHaltErrorCounts[sentryName] >= sentryHaltErrorNotifyThreshold {
+					setAlertLevel(alertLevelHigh)
+				} else {
+					setAlertLevel(alertLevelWarning)
+				}
+			}
+			alertState.SentryHaltErrorCounts[sentryName]++
 		default:
 			addAlert(err)
 			setAlertLevel(alertLevelWarning)
@@ -494,6 +527,30 @@ func getAlertNotification(
 			}
 			alertState.SentryGRPCErrorCounts[sentryName] = 0
 			alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, fmt.Sprintf("%s grpc error", sentryName))
+		}
+	}
+	for sentryName := range alertState.SentryHaltErrorCounts {
+		sentryHasHaltError := false
+		for _, foundSentryName := range foundSentryHaltErrors {
+			if foundSentryName == sentryName {
+				sentryHasHaltError = true
+				break
+			}
+		}
+
+		sentryHasGRPCError := false
+		for _, foundSentryName := range foundSentryGRPCErrors {
+			if foundSentryName == sentryName {
+				sentryHasGRPCError = true
+				break
+			}
+		}
+		if !sentryHasHaltError && !sentryHasGRPCError && alertState.SentryHaltErrorCounts[sentryName] > 0 {
+			if alertState.SentryHaltErrorCounts[sentryName] > sentryHaltErrorNotifyThreshold {
+				alertNotification.NotifyForClear = true
+			}
+			alertState.SentryHaltErrorCounts[sentryName] = 0
+			alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, fmt.Sprintf("%s halt error", sentryName))
 		}
 	}
 	for sentryName := range alertState.SentryOutOfSyncErrorCounts {

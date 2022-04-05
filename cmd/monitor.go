@@ -52,6 +52,8 @@ var monitorCmd = &cobra.Command{
 				AlertTypeCounts:            make(map[AlertType]int64),
 				SentryGRPCErrorCounts:      make(map[string]int64),
 				SentryOutOfSyncErrorCounts: make(map[string]int64),
+				SentryHaltErrorCounts:      make(map[string]int64),
+				SentryLatestHeight:         make(map[string]int64),
 			}
 			if i == len(config.Validators)-1 {
 				runMonitor(notificationService, alertState[vm.Name], configFile, &config, vm, &writeConfigMutex)

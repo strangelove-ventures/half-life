@@ -18,6 +18,7 @@ const (
 	recentMissedBlocksNotifyThreshold    = 10
 	sentryGRPCErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
 	sentryOutOfSyncErrorNotifyThreshold  = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
+	sentryHaltErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
 )
 
 type AlertLevel int8
@@ -38,6 +39,7 @@ const (
 	alertTypeBlockFetch
 	alertTypeMissedRecentBlocks
 	alertTypeGenericRPC
+	alertTypeHalt
 
 	// leave this at the end for iteration
 	alertTypeEnd
@@ -49,6 +51,7 @@ const (
 	sentryAlertTypeNone SentryAlertType = iota
 	sentryAlertTypeGRPCError
 	sentryAlertTypeOutOfSyncError
+	sentryAlertTypeHalt
 )
 
 type SentryStats struct {
@@ -75,6 +78,8 @@ type ValidatorAlertState struct {
 	AlertTypeCounts              map[AlertType]int64
 	SentryGRPCErrorCounts        map[string]int64
 	SentryOutOfSyncErrorCounts   map[string]int64
+	SentryHaltErrorCounts        map[string]int64
+	SentryLatestHeight           map[string]int64
 	RecentMissedBlocksCounter    int64
 	RecentMissedBlocksCounterMax int64
 	LatestBlockChecked           int64
