@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/DisgoOrg/disgo/discord"
+	"github.com/DisgoOrg/disgo/rest"
 	"github.com/DisgoOrg/disgo/webhook"
 	"github.com/DisgoOrg/snowflake"
 )
@@ -154,14 +156,18 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 	stats ValidatorStats,
 	writeConfigMutex *sync.Mutex,
 ) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
+	defer cancel()
 	if vm.DiscordStatusMessageID != nil {
+
 		_, err := service.client.UpdateMessage(snowflake.Snowflake(*vm.DiscordStatusMessageID), discord.WebhookMessageUpdate{
 			Embeds: &[]discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
-		})
+		}, rest.WithCtx(ctx))
 		if err != nil {
 			fmt.Printf("Error updating discord message: %v\n", err)
+			return
 		}
 	} else {
 		message, err := service.client.CreateMessage(discord.WebhookMessageCreate{
@@ -169,9 +175,10 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 			Embeds: []discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
-		})
+		}, rest.WithCtx(ctx))
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
+			return
 		}
 		messageID := string(message.ID)
 		vm.DiscordStatusMessageID = &messageID
@@ -209,6 +216,8 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		if alertNotification.AlertLevel > alertLevelWarning {
 			toNotify = strings.Trim(tagUser, " ")
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
+		defer cancel()
 		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
@@ -219,7 +228,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 					Color:       alertColor,
 				},
 			},
-		})
+		}, rest.WithCtx(ctx))
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
 		}
@@ -234,6 +243,8 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		if alertNotification.NotifyForClear {
 			toNotify = strings.Trim(tagUser, " ")
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
+		defer cancel()
 		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
@@ -244,7 +255,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 					Color:       colorGood,
 				},
 			},
-		})
+		}, rest.WithCtx(ctx))
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
 		}
