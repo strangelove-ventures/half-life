@@ -20,7 +20,6 @@ const (
 func monitorValidator(
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
-	alertState *ValidatorAlertState,
 ) (errs []error) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
@@ -147,6 +146,7 @@ func monitorSentry(
 	stats *ValidatorStats,
 	vm *ValidatorMonitor,
 	alertState *ValidatorAlertState,
+	alertStateLock *sync.Mutex,
 ) {
 	nodeInfo, syncInfo, err := getSentryInfo(sentry.GRPC)
 	var errsToAdd []error
@@ -157,7 +157,10 @@ func monitorSentry(
 	} else {
 		sentryStats.Height = syncInfo.Block.Header.Height
 		sentryStats.Version = nodeInfo.ApplicationVersion.GetVersion()
+		alertStateLock.Lock()
 		blockDelta := syncInfo.Block.Header.Height - alertState.SentryLatestHeight[sentry.Name]
+		alertState.SentryLatestHeight[sentry.Name] = syncInfo.Block.Header.Height
+		alertStateLock.Unlock()
 		if blockDelta == 0 {
 			timeSinceLastBlock := time.Now().UnixNano() - syncInfo.Block.Header.Time.UnixNano()
 			if timeSinceLastBlock > haltThresholdNanoseconds {
@@ -165,7 +168,6 @@ func monitorSentry(
 				sentryStats.SentryAlertType = sentryAlertTypeHalt
 			}
 		}
-		alertState.SentryLatestHeight[sentry.Name] = syncInfo.Block.Header.Height
 	}
 	errsLock.Lock()
 	stats.SentryStats = append(stats.SentryStats, &sentryStats)
@@ -178,6 +180,7 @@ func monitorSentries(
 	stats *ValidatorStats,
 	vm *ValidatorMonitor,
 	alertState *ValidatorAlertState,
+	alertStateLock *sync.Mutex,
 ) []error {
 	errs := make([]error, 0)
 	wg := sync.WaitGroup{}
@@ -185,7 +188,7 @@ func monitorSentries(
 	sentries := *vm.Sentries
 	wg.Add(len(sentries))
 	for _, sentry := range sentries {
-		go monitorSentry(&wg, &errs, &errsLock, sentry, stats, vm, alertState)
+		go monitorSentry(&wg, &errs, &errsLock, sentry, stats, vm, alertState, alertStateLock)
 	}
 	wg.Wait()
 	return errs
@@ -194,6 +197,7 @@ func monitorSentries(
 func runMonitor(
 	notificationService NotificationService,
 	alertState *ValidatorAlertState,
+	alertStateLock *sync.Mutex,
 	configFile string,
 	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
@@ -215,7 +219,7 @@ func runMonitor(
 			}
 
 			for i := 0; i < rpcRetries; i++ {
-				valErrs = monitorValidator(vm, &stats, alertState)
+				valErrs = monitorValidator(vm, &stats)
 				if len(valErrs) == 0 {
 					fmt.Printf("No errors found for validator: %s\n", vm.Name)
 					break
@@ -243,7 +247,7 @@ func runMonitor(
 		if vm.Sentries != nil {
 			wg.Add(1)
 			go func() {
-				sentryErrs = monitorSentries(&stats, vm, alertState)
+				sentryErrs = monitorSentries(&stats, vm, alertState, alertStateLock)
 				if len(sentryErrs) == 0 {
 					fmt.Printf("No errors found for validator sentries: %s\n", vm.Name)
 				} else {
@@ -268,7 +272,9 @@ func runMonitor(
 			errs = append(errs, aggregatedErrs...)
 		}
 
+		alertStateLock.Lock()
 		notification := getAlertNotification(vm, &stats, alertState, errs)
+		alertStateLock.Unlock()
 
 		if notification != nil {
 			notificationService.SendValidatorAlertNotification(config, vm, stats, notification)
@@ -347,6 +353,7 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 	return
 }
 
+// requires locked alertState
 func getAlertNotification(
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
@@ -383,6 +390,8 @@ func getAlertNotification(
 		}
 	}
 
+	recentMissedBlocksCounter := alertState.RecentMissedBlocksCounter
+
 	for _, err := range errs {
 		switch err := err.(type) {
 		case *JailedError:
@@ -400,12 +409,12 @@ func getAlertNotification(
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
 		case *MissedRecentBlocksError:
 			addRecentMissedBlocksAlertIfNecessary := func(alertLevel AlertLevel) {
-				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != alertState.RecentMissedBlocksCounter {
+				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != recentMissedBlocksCounter {
 					addAlert(err)
 					setAlertLevel(alertLevel)
 				}
 			}
-			if stats.RecentMissedBlocks > alertState.RecentMissedBlocksCounter {
+			if stats.RecentMissedBlocks > recentMissedBlocksCounter {
 				if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
 					stats.RecentMissedBlockAlertLevel = alertLevelHigh
 					addRecentMissedBlocksAlertIfNecessary(alertLevelHigh)

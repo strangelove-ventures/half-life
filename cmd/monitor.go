@@ -55,10 +55,11 @@ var monitorCmd = &cobra.Command{
 				SentryHaltErrorCounts:      make(map[string]int64),
 				SentryLatestHeight:         make(map[string]int64),
 			}
+			alertStateLock := sync.Mutex{}
 			if i == len(config.Validators)-1 {
-				runMonitor(notificationService, alertState[vm.Name], configFile, &config, vm, &writeConfigMutex)
+				runMonitor(notificationService, alertState[vm.Name], &alertStateLock, configFile, &config, vm, &writeConfigMutex)
 			} else {
-				go runMonitor(notificationService, alertState[vm.Name], configFile, &config, vm, &writeConfigMutex)
+				go runMonitor(notificationService, alertState[vm.Name], &alertStateLock, configFile, &config, vm, &writeConfigMutex)
 			}
 		}
 	},
