@@ -25,7 +25,8 @@ const (
 )
 
 type DiscordNotificationService struct {
-	client *webhook.Client
+	webhookID    string
+	webhookToken string
 }
 
 func formattedTime(t time.Time) string {
@@ -34,7 +35,8 @@ func formattedTime(t time.Time) string {
 
 func NewDiscordNotificationService(webhookID, webhookToken string) *DiscordNotificationService {
 	return &DiscordNotificationService{
-		client: webhook.NewClient(snowflake.Snowflake(webhookID), webhookToken),
+		webhookID:    webhookID,
+		webhookToken: webhookToken,
 	}
 }
 
@@ -148,6 +150,10 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 	}
 }
 
+func (service *DiscordNotificationService) client() *webhook.Client {
+	return webhook.NewClient(snowflake.Snowflake(service.webhookID), service.webhookToken)
+}
+
 // implements NotificationService interface
 func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 	configFile string,
@@ -158,9 +164,11 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 ) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
 	defer cancel()
+	client := service.client()
+	defer client.Close(ctx)
 	if vm.DiscordStatusMessageID != nil {
 
-		_, err := service.client.UpdateMessage(snowflake.Snowflake(*vm.DiscordStatusMessageID), discord.WebhookMessageUpdate{
+		_, err := client.UpdateMessage(snowflake.Snowflake(*vm.DiscordStatusMessageID), discord.WebhookMessageUpdate{
 			Embeds: &[]discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
@@ -170,7 +178,7 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 			return
 		}
 	} else {
-		message, err := service.client.CreateMessage(discord.WebhookMessageCreate{
+		message, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Embeds: []discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
@@ -218,7 +226,9 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
 		defer cancel()
-		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
+		client := service.client()
+		defer client.Close(ctx)
+		_, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
 			Embeds: []discord.Embed{
@@ -245,7 +255,9 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*4))
 		defer cancel()
-		_, err := service.client.CreateMessage(discord.WebhookMessageCreate{
+		client := service.client()
+		defer client.Close(ctx)
+		_, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
 			Embeds: []discord.Embed{
