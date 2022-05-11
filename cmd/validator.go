@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"sync"
@@ -33,6 +34,21 @@ func monitorValidator(
 		errs = append(errs, err)
 		return
 	}
+
+	addr, err := hex.DecodeString("4658F97E7B70B55D69D26C100C1F9D7CE1B7160C")
+	if err != nil {
+		errs = append(errs, err)
+		return
+	}
+
+	bech32Encoded, err := bech32.ConvertAndEncode("penumbravalcons", addr)
+
+	if err != nil {
+		errs = append(errs, err)
+		return
+	}
+
+	fmt.Printf("Us bech32: %s\n", bech32Encoded)
 
 	valInfo, err := getSigningInfo(client, vm.Address)
 	slashingPeriod := int64(10000)
@@ -89,7 +105,9 @@ func monitorValidator(
 				break
 			}
 			found := false
+			fmt.Printf("Us: %v\n", hexAddress)
 			for _, voter := range block.Block.LastCommit.Signatures {
+				fmt.Printf("Voter: %v\n", voter.ValidatorAddress)
 				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 					if block.Block.Height > stats.LastSignedBlockHeight {
 						stats.LastSignedBlockHeight = block.Block.Height
@@ -121,6 +139,7 @@ func monitorValidator(
 						break
 					}
 					for _, voter := range block.Block.LastCommit.Signatures {
+						fmt.Printf("Voter: %v\n", voter)
 						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 							stats.LastSignedBlockHeight = block.Block.Height
 							stats.LastSignedBlockTimestamp = block.Block.Time

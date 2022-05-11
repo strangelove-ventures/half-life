@@ -27,6 +27,7 @@ const (
 type DiscordNotificationService struct {
 	webhookID    string
 	webhookToken string
+	postMutex    *sync.Mutex
 }
 
 func formattedTime(t time.Time) string {
@@ -37,6 +38,7 @@ func NewDiscordNotificationService(webhookID, webhookToken string) *DiscordNotif
 	return &DiscordNotificationService{
 		webhookID:    webhookID,
 		webhookToken: webhookToken,
+		postMutex:    &sync.Mutex{},
 	}
 }
 
@@ -167,23 +169,26 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 	client := service.client()
 	defer client.Close(ctx)
 	if vm.DiscordStatusMessageID != nil {
-
+		service.postMutex.Lock()
 		_, err := client.UpdateMessage(snowflake.Snowflake(*vm.DiscordStatusMessageID), discord.WebhookMessageUpdate{
 			Embeds: &[]discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
 		}, rest.WithCtx(ctx))
+		service.postMutex.Unlock()
 		if err != nil {
 			fmt.Printf("Error updating discord message: %v\n", err)
 			return
 		}
 	} else {
+		service.postMutex.Lock()
 		message, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Embeds: []discord.Embed{
 				getCurrentStatsEmbed(stats, vm),
 			},
 		}, rest.WithCtx(ctx))
+		service.postMutex.Unlock()
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
 			return
@@ -228,6 +233,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		defer cancel()
 		client := service.client()
 		defer client.Close(ctx)
+		service.postMutex.Lock()
 		_, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
@@ -239,6 +245,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 				},
 			},
 		}, rest.WithCtx(ctx))
+		service.postMutex.Unlock()
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
 		}
@@ -257,6 +264,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 		defer cancel()
 		client := service.client()
 		defer client.Close(ctx)
+		service.postMutex.Lock()
 		_, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Content:  toNotify,
@@ -268,6 +276,7 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 				},
 			},
 		}, rest.WithCtx(ctx))
+		service.postMutex.Unlock()
 		if err != nil {
 			fmt.Printf("Error sending discord message: %v\n", err)
 		}
