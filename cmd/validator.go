@@ -48,8 +48,6 @@ func monitorValidator(
 		return
 	}
 
-	fmt.Printf("Us bech32: %s\n", bech32Encoded)
-
 	valInfo, err := getSigningInfo(client, vm.Address)
 	slashingPeriod := int64(10000)
 	if err != nil {
@@ -105,9 +103,7 @@ func monitorValidator(
 				break
 			}
 			found := false
-			fmt.Printf("Us: %v\n", hexAddress)
 			for _, voter := range block.Block.LastCommit.Signatures {
-				fmt.Printf("Voter: %v\n", voter.ValidatorAddress)
 				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 					if block.Block.Height > stats.LastSignedBlockHeight {
 						stats.LastSignedBlockHeight = block.Block.Height
@@ -139,7 +135,6 @@ func monitorValidator(
 						break
 					}
 					for _, voter := range block.Block.LastCommit.Signatures {
-						fmt.Printf("Voter: %v\n", voter)
 						if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
 							stats.LastSignedBlockHeight = block.Block.Height
 							stats.LastSignedBlockTimestamp = block.Block.Time
