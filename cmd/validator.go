@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"reflect"
 	"sync"
@@ -34,14 +33,6 @@ func monitorValidator(
 		errs = append(errs, err)
 		return
 	}
-
-	addr, err := hex.DecodeString("4658F97E7B70B55D69D26C100C1F9D7CE1B7160C")
-	if err != nil {
-		errs = append(errs, err)
-		return
-	}
-
-	bech32Encoded, err := bech32.ConvertAndEncode("penumbravalcons", addr)
 
 	if err != nil {
 		errs = append(errs, err)
