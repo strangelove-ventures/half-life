@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -30,20 +31,50 @@ const (
 	alertLevelCritical
 )
 
-type AlertType int8
+type AlertType string
 
 const (
-	alertTypeJailed AlertType = iota
-	alertTypeTombstoned
-	alertTypeOutOfSync
-	alertTypeBlockFetch
-	alertTypeMissedRecentBlocks
-	alertTypeGenericRPC
-	alertTypeHalt
-
-	// leave this at the end for iteration
-	alertTypeEnd
+	alertTypeJailed             AlertType = "alertTypeJailed"
+	alertTypeTombstoned                   = "alertTypeTombstoned"
+	alertTypeOutOfSync                    = "alertTypeOutOfSync"
+	alertTypeBlockFetch                   = "alertTypeBlockFetch"
+	alertTypeMissedRecentBlocks           = "alertTypeMissedRecentBlocks"
+	alertTypeGenericRPC                   = "alertTypeGenericRPC"
+	alertTypeHalt                         = "alertTypeHalt"
 )
+
+var alertTypes = []AlertType{
+	alertTypeJailed,
+	alertTypeTombstoned,
+	alertTypeOutOfSync,
+	alertTypeBlockFetch,
+	alertTypeMissedRecentBlocks,
+	alertTypeGenericRPC,
+	alertTypeHalt,
+}
+
+func (at *AlertType) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	alertType := ""
+	err := unmarshal(&alertType)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, s := range alertTypes {
+		a := AlertType(alertType)
+		if s == a {
+			found = true
+			*at = a
+		}
+	}
+
+	if !found {
+		return errors.New("Invalid AlertType")
+	}
+
+	return nil
+}
 
 type SentryAlertType int8
 
@@ -98,7 +129,21 @@ type NotificationsConfig struct {
 	Discord *DiscordChannelConfig `yaml:"discord"`
 }
 
+type AlertConfig struct {
+	IgnoreAlerts []*AlertType `yaml:"ignore-alerts"`
+}
+
+func (at *AlertConfig) AlertActive(alert AlertType) bool {
+	for _, a := range at.IgnoreAlerts {
+		if *a == alert {
+			return false
+		}
+	}
+	return true
+}
+
 type HalfLifeConfig struct {
+	AlertConfig   AlertConfig          `yaml:"alerts"`
 	Notifications *NotificationsConfig `yaml:"notifications"`
 	Validators    []*ValidatorMonitor  `yaml:"validators"`
 }
