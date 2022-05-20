@@ -21,7 +21,7 @@ func (e *ignoreableError) Error() string {
 	return e.err.Error()
 }
 func (e *ignoreableError) Active(config AlertConfig) bool {
-	return false
+	return true
 }
 func newIgnorableError(err error) *ignoreableError {
 	return &ignoreableError{err}
