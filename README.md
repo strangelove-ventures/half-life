@@ -16,6 +16,35 @@ Discord messages are created in the configured webhook channel for:
 
 ## Quick start
 
+### Install Go
+
+Go is necessary in order to install `halflife`.
+
+```
+# install
+wget https://golang.org/dl/go1.18.2.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.18.2.linux-amd64.tar.gz
+
+# source go
+cat <<EOF >> ~/.profile
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export GO111MODULE=on
+export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+EOF
+source ~/.profile
+go version
+```
+
+### Install halflife binary
+
+```
+cd ~/half-life
+go install
+```
+
+### Setup config.yaml
+
 Copy `config.yaml.example` to `config.yaml` and populate with your discord and validator information. 
 You can optionally provide the `sentries` array to also monitor the sentries via grpc.
 `rpc-retries` can optionally be provided to override the default of 5 RPC retries before alerting, useful for congested RPC servers.
@@ -25,13 +54,13 @@ See [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webh
 Begin monitoring with:
 
 ```bash
-half-life monitor
+halflife monitor
 ```
 
 By default, `half-life monitor` will look for `config.yaml` in the current working directory. To specify a different config file path, use the `--file`/`-f` flag:
 
 ```bash
-half-life monitor -f ~/config.yaml
+halflife monitor -f ~/config.yaml
 ```
 
 When a validator is first added to `config.yaml` and halflife is started, a status message will be created in the discord channel and the ID of that message will be added to `config.yaml`. Pin this message so that the channel's pinned messages can act as a dashboard to see the realtime status of the validators.
