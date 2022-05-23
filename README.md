@@ -51,6 +51,19 @@ You can optionally provide the `sentries` array to also monitor the sentries via
 
 See [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for how to create a webhook for a discord channel.
 
+Once you've created the webhook, copy the URL. It'll look something like this: `https://discord.com/api/webhooks/978129125394247720/cwM4Ks-kWcK3Jsg4I_cboauYjOa48ngI2VKaS76afsMwuY7-U4Frw3BGcYXCJvZJ2kWD`
+
+This will be used later to be put into the config.yaml. The webhook id is `978129125394247720` (from the URL), and webhook token is `cwM4Ks-kWcK3Jsg4I_cboauYjOa48ngI2VKaS76afsMwuY7-U4Frw3BGcYXCJvZJ2kWD`
+
+Save the values as follows (note these values are from the URL):
+```yml:
+webhook:
+  id: 978129125394247720
+  token: cwM4Ks-kWcK3Jsg4I_cboauYjOa48ngI2VKaS76afsMwuY7-U4Frw3BGcYXCJvZJ2kWD
+```
+
+### Start monitoring
+
 Begin monitoring with:
 
 ```bash
