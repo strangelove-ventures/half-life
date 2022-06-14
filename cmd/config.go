@@ -35,12 +35,12 @@ type AlertType string
 
 const (
 	alertTypeJailed             AlertType = "alertTypeJailed"
-	alertTypeTombstoned                   = "alertTypeTombstoned"
-	alertTypeOutOfSync                    = "alertTypeOutOfSync"
-	alertTypeBlockFetch                   = "alertTypeBlockFetch"
-	alertTypeMissedRecentBlocks           = "alertTypeMissedRecentBlocks"
-	alertTypeGenericRPC                   = "alertTypeGenericRPC"
-	alertTypeHalt                         = "alertTypeHalt"
+	alertTypeTombstoned         AlertType = "alertTypeTombstoned"
+	alertTypeOutOfSync          AlertType = "alertTypeOutOfSync"
+	alertTypeBlockFetch         AlertType = "alertTypeBlockFetch"
+	alertTypeMissedRecentBlocks AlertType = "alertTypeMissedRecentBlocks"
+	alertTypeGenericRPC         AlertType = "alertTypeGenericRPC"
+	alertTypeHalt               AlertType = "alertTypeHalt"
 )
 
 var alertTypes = []AlertType{
