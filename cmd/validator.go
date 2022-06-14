@@ -20,7 +20,7 @@ const (
 func monitorValidator(
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
-) (errs []error) {
+) (errs []IgnorableError) {
 	stats.LastSignedBlockHeight = -1
 	fmt.Printf("Monitoring validator: %s\n", vm.Name)
 	client, err := getCosmosClient(vm.RPC, vm.ChainID)
@@ -30,12 +30,7 @@ func monitorValidator(
 	}
 	_, hexAddress, err := bech32.DecodeAndConvert(vm.Address)
 	if err != nil {
-		errs = append(errs, err)
-		return
-	}
-
-	if err != nil {
-		errs = append(errs, err)
+		errs = append(errs, newIgnorableError(err))
 		return
 	}
 
@@ -210,7 +205,7 @@ func runMonitor(
 ) {
 	for {
 		stats := ValidatorStats{}
-		var valErrs []error
+		var valErrs []IgnorableError
 		var sentryErrs []error
 
 		wg := sync.WaitGroup{}
@@ -266,7 +261,11 @@ func runMonitor(
 
 		errs := []error{}
 		if len(valErrs) > 0 {
-			errs = append(errs, valErrs...)
+			for _, e := range valErrs {
+				if e.Active(config.AlertConfig) {
+					errs = append(errs, e)
+				}
+			}
 		}
 		if len(sentryErrs) > 0 {
 			errs = append(errs, sentryErrs...)
@@ -495,7 +494,7 @@ func getAlertNotification(
 	foundRPCError := hasAlertType(alertTypeOutOfSync) || hasAlertType(alertTypeGenericRPC)
 
 	// iterate through all error types
-	for i := alertTypeJailed; i < alertTypeEnd; i++ {
+	for _, i := range alertTypes {
 		// reset alert type if we didn't see it this time and it's either an RPC error or there are no RPC errors
 		// should only clear jailed, tombstoned, and missed recent blocks errors if there also isn't a generic RPC error or RPC server out of sync error
 		if !hasAlertType(i) && alertState.AlertTypeCounts[i] > 0 {
