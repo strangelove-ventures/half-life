@@ -57,13 +57,18 @@ func getColorForAlertLevel(alertLevel AlertLevel) int {
 
 func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Embed {
 	var uptime string
-	if stats.SlashingPeriodUptime == 0 {
-		uptime = "N/A"
+	var title string
+	if vm.FullNode {
+		title = vm.Name
 	} else {
-		uptime = fmt.Sprintf("%.02f", stats.SlashingPeriodUptime)
-	}
+		if stats.SlashingPeriodUptime == 0 {
+			uptime = "N/A"
+		} else {
+			uptime = fmt.Sprintf("%.02f", stats.SlashingPeriodUptime)
+		}
 
-	title := fmt.Sprintf("%s (%s%% up)", vm.Name, uptime)
+		title = fmt.Sprintf("%s (%s%% up)", vm.Name, uptime)
+	}
 
 	var description string
 	sentryString := ""
@@ -115,32 +120,37 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 			rpcStatusIcon = iconError
 		} else {
 			rpcStatusIcon = iconGood
-			var recentSignedBlocksIcon string
-			if stats.RecentMissedBlockAlertLevel >= alertLevelHigh {
-				recentSignedBlocksIcon = iconError
-			} else if stats.RecentMissedBlockAlertLevel == alertLevelWarning {
-				recentSignedBlocksIcon = iconWarning
-			} else {
-				recentSignedBlocksIcon = iconGood
+			if !vm.FullNode {
+				var recentSignedBlocksIcon string
+				if stats.RecentMissedBlockAlertLevel >= alertLevelHigh {
+					recentSignedBlocksIcon = iconError
+				} else if stats.RecentMissedBlockAlertLevel == alertLevelWarning {
+					recentSignedBlocksIcon = iconWarning
+				} else {
+					recentSignedBlocksIcon = iconGood
+				}
+				recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck)
 			}
-			recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, recentBlocksToCheck-stats.RecentMissedBlocks, recentBlocksToCheck)
-
 		}
 		latestBlock = fmt.Sprintf("%s Height **%s** - **%s**", rpcStatusIcon, fmt.Sprint(stats.Height), formattedTime(stats.Timestamp))
 	}
 
-	if stats.Height == stats.LastSignedBlockHeight {
-		description = fmt.Sprintf("%s\n%s%s",
-			latestBlock, recentSignedBlocks, sentryString)
+	if vm.FullNode {
+		description = fmt.Sprintf("%s%s", latestBlock, sentryString)
 	} else {
-		var lastSignedBlock string
-		if stats.LastSignedBlockHeight == -1 {
-			lastSignedBlock = fmt.Sprintf("%s Last Signed **N/A**", iconError)
+		if stats.Height == stats.LastSignedBlockHeight {
+			description = fmt.Sprintf("%s\n%s%s",
+				latestBlock, recentSignedBlocks, sentryString)
 		} else {
-			lastSignedBlock = fmt.Sprintf("%s Last Signed **%s** - **%s**", iconError, fmt.Sprint(stats.LastSignedBlockHeight), formattedTime(stats.LastSignedBlockTimestamp))
+			var lastSignedBlock string
+			if stats.LastSignedBlockHeight == -1 {
+				lastSignedBlock = fmt.Sprintf("%s Last Signed **N/A**", iconError)
+			} else {
+				lastSignedBlock = fmt.Sprintf("%s Last Signed **%s** - **%s**", iconError, fmt.Sprint(stats.LastSignedBlockHeight), formattedTime(stats.LastSignedBlockTimestamp))
+			}
+			description = fmt.Sprintf("%s\n%s\n%s%s",
+				latestBlock, lastSignedBlock, recentSignedBlocks, sentryString)
 		}
-		description = fmt.Sprintf("%s\n%s\n%s%s",
-			latestBlock, lastSignedBlock, recentSignedBlocks, sentryString)
 	}
 
 	color := getColorForAlertLevel(stats.AlertLevel)
@@ -213,10 +223,14 @@ func (service *DiscordNotificationService) SendValidatorAlertNotification(
 	}
 
 	var embedTitle string
-	if stats.SlashingPeriodUptime > 0 {
-		embedTitle = fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime)
+	if vm.FullNode {
+		embedTitle = vm.Name
 	} else {
-		embedTitle = fmt.Sprintf("%s (N/A%% up)", vm.Name)
+		if stats.SlashingPeriodUptime > 0 {
+			embedTitle = fmt.Sprintf("%s (%.02f%% up)", vm.Name, stats.SlashingPeriodUptime)
+		} else {
+			embedTitle = fmt.Sprintf("%s (N/A%% up)", vm.Name)
+		}
 	}
 
 	if len(alertNotification.Alerts) > 0 {

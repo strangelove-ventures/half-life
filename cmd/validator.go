@@ -28,30 +28,32 @@ func monitorValidator(
 		errs = append(errs, newGenericRPCError(err.Error()))
 		return
 	}
-	_, hexAddress, err := bech32.DecodeAndConvert(vm.Address)
-	if err != nil {
-		errs = append(errs, newIgnorableError(err))
-		return
-	}
-
-	valInfo, err := getSigningInfo(client, vm.Address)
 	slashingPeriod := int64(10000)
-	if err != nil {
-		errs = append(errs, newGenericRPCError(err.Error()))
-	} else {
-		signingInfo := valInfo.ValSigningInfo
-		if signingInfo.Tombstoned {
-			errs = append(errs, newTombstonedError())
+	var hexAddress []byte
+	if !vm.FullNode {
+		_, hexAddress, err = bech32.DecodeAndConvert(vm.Address)
+		if err != nil {
+			errs = append(errs, newIgnorableError(err))
+			return
 		}
-		if signingInfo.JailedUntil.After(time.Now()) {
-			errs = append(errs, newJailedError(signingInfo.JailedUntil))
-		}
-		slashingInfo, err := getSlashingInfo(client)
+		valInfo, err := getSigningInfo(client, vm.Address)
 		if err != nil {
 			errs = append(errs, newGenericRPCError(err.Error()))
 		} else {
-			slashingPeriod = slashingInfo.Params.SignedBlocksWindow
-			stats.SlashingPeriodUptime = 100.0 - 100.0*(float64(signingInfo.MissedBlocksCounter)/float64(slashingPeriod))
+			signingInfo := valInfo.ValSigningInfo
+			if signingInfo.Tombstoned {
+				errs = append(errs, newTombstonedError())
+			}
+			if signingInfo.JailedUntil.After(time.Now()) {
+				errs = append(errs, newJailedError(signingInfo.JailedUntil))
+			}
+			slashingInfo, err := getSlashingInfo(client)
+			if err != nil {
+				errs = append(errs, newGenericRPCError(err.Error()))
+			} else {
+				slashingPeriod = slashingInfo.Params.SignedBlocksWindow
+				stats.SlashingPeriodUptime = 100.0 - 100.0*(float64(signingInfo.MissedBlocksCounter)/float64(slashingPeriod))
+			}
 		}
 	}
 	node, err := client.GetNode()
@@ -76,35 +78,37 @@ func monitorValidator(
 		stats.Height = status.SyncInfo.LatestBlockHeight
 		stats.Timestamp = status.SyncInfo.LatestBlockTime
 		stats.RecentMissedBlocks = 0
-		for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
-			blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
-			block, err := node.Block(blockCtx, &i)
-			blockCtxCancel()
-			if err != nil {
-				// generic RPC error for this one so it will be included in the generic RPC error retry
-				errs = append(errs, newGenericRPCError(newBlockFetchError(i, vm.RPC).Error()))
-				continue
-			}
-			if i == 1 {
-				break
-			}
-			found := false
-			for _, voter := range block.Block.LastCommit.Signatures {
-				if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
-					if block.Block.Height > stats.LastSignedBlockHeight {
-						stats.LastSignedBlockHeight = block.Block.Height
-						stats.LastSignedBlockTimestamp = block.Block.Time
-					}
-					found = true
+		if !vm.FullNode {
+			for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
+				blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+				block, err := node.Block(blockCtx, &i)
+				blockCtxCancel()
+				if err != nil {
+					// generic RPC error for this one so it will be included in the generic RPC error retry
+					errs = append(errs, newGenericRPCError(newBlockFetchError(i, vm.RPC).Error()))
+					continue
+				}
+				if i == 1 {
 					break
 				}
-			}
-			if !found {
-				stats.RecentMissedBlocks++
+				found := false
+				for _, voter := range block.Block.LastCommit.Signatures {
+					if reflect.DeepEqual(voter.ValidatorAddress, bytes.HexBytes(hexAddress)) {
+						if block.Block.Height > stats.LastSignedBlockHeight {
+							stats.LastSignedBlockHeight = block.Block.Height
+							stats.LastSignedBlockTimestamp = block.Block.Time
+						}
+						found = true
+						break
+					}
+				}
+				if !found {
+					stats.RecentMissedBlocks++
+				}
 			}
 		}
 
-		if stats.RecentMissedBlocks > 0 {
+		if !vm.FullNode && stats.RecentMissedBlocks > 0 {
 			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
@@ -209,6 +213,7 @@ func runMonitor(
 		var sentryErrs []error
 
 		wg := sync.WaitGroup{}
+		fmt.Printf("Monitoring validator\n")
 		wg.Add(1)
 		go func() {
 			var rpcRetries int
@@ -271,7 +276,7 @@ func runMonitor(
 			errs = append(errs, sentryErrs...)
 		}
 
-		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel()
+		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(vm.FullNode)
 		if len(aggregatedErrs) > 0 {
 			errs = append(errs, aggregatedErrs...)
 		}
@@ -297,7 +302,7 @@ func (stats *ValidatorStats) increaseAlertLevel(alertLevel AlertLevel) {
 }
 
 // determine alert level and any additional errors now that RPC And sentry checks are complete
-func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []error) {
+func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode bool) (errs []error) {
 	sentryErrorCount := 0
 	for _, sentryStat := range stats.SentryStats {
 		if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
@@ -323,36 +328,38 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel() (errs []er
 		stats.increaseAlertLevel(alertLevelHigh)
 	}
 
-	if stats.Height == stats.LastSignedBlockHeight {
-		if stats.RecentMissedBlocks == 0 {
-			if stats.SlashingPeriodUptime > slashingPeriodUptimeWarningThreshold {
-				// no recent missed blocks and above warning threshold for slashing period uptime, all good
-				return
+	if !fullnode {
+		if stats.Height == stats.LastSignedBlockHeight {
+			if stats.RecentMissedBlocks == 0 {
+				if stats.SlashingPeriodUptime > slashingPeriodUptimeWarningThreshold {
+					// no recent missed blocks and above warning threshold for slashing period uptime, all good
+					return
+				} else {
+					// Warning for recovering from downtime. Not error because we are currently signing
+					stats.increaseAlertLevel(alertLevelWarning)
+					return
+				}
 			} else {
-				// Warning for recovering from downtime. Not error because we are currently signing
+				// Warning for missing recent blocks, but have signed current block
 				stats.increaseAlertLevel(alertLevelWarning)
 				return
 			}
-		} else {
-			// Warning for missing recent blocks, but have signed current block
-			stats.increaseAlertLevel(alertLevelWarning)
-			return
 		}
-	}
 
-	// past this, we have not signed the most recent block
+		// past this, we have not signed the most recent block
 
-	if stats.RecentMissedBlocks < recentBlocksToCheck {
-		// we have missed some, but not all, of the recent blocks to check
-		if stats.SlashingPeriodUptime > slashingPeriodUptimeErrorThreshold {
-			stats.increaseAlertLevel(alertLevelWarning)
+		if stats.RecentMissedBlocks < recentBlocksToCheck {
+			// we have missed some, but not all, of the recent blocks to check
+			if stats.SlashingPeriodUptime > slashingPeriodUptimeErrorThreshold {
+				stats.increaseAlertLevel(alertLevelWarning)
+			} else {
+				// we are below slashing period uptime error threshold
+				stats.increaseAlertLevel(alertLevelHigh)
+			}
 		} else {
-			// we are below slashing period uptime error threshold
+			// Error, missed all of the recent blocks to check
 			stats.increaseAlertLevel(alertLevelHigh)
 		}
-	} else {
-		// Error, missed all of the recent blocks to check
-		stats.increaseAlertLevel(alertLevelHigh)
 	}
 	return
 }
