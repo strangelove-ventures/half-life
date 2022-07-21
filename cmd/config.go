@@ -172,6 +172,7 @@ type ValidatorMonitor struct {
 	ChainID                string    `yaml:"chain-id"`
 	DiscordStatusMessageID *string   `yaml:"discord-status-message-id"`
 	RPCRetries             *int      `yaml:"rpc-retries"`
+	MissedBlocksThreshold  *int64    `yaml:"missed-blocks-threshold"`
 	Sentries               *[]Sentry `yaml:"sentries"`
 }
 

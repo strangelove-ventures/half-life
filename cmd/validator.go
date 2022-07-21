@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	rpcErrorRetries          = 5
-	outOfSyncThreshold       = 5
-	haltThresholdNanoseconds = 3e11 // if nodes are stuck for > 5 minutes, will be considered halt
+	rpcErrorRetries              = 5
+	outOfSyncThreshold           = 5
+	haltThresholdNanoseconds     = 3e11 // if nodes are stuck for > 5 minutes, will be considered halt
+	defaultMissedBlocksThreshold = 0
 )
 
 func monitorValidator(
@@ -108,7 +109,14 @@ func monitorValidator(
 			}
 		}
 
-		if !vm.FullNode && stats.RecentMissedBlocks > 0 {
+		var missedBlocksThreshold int64
+		if vm.MissedBlocksThreshold == nil {
+			missedBlocksThreshold = defaultMissedBlocksThreshold
+		} else {
+			missedBlocksThreshold = *vm.MissedBlocksThreshold
+		}
+
+		if !vm.FullNode && stats.RecentMissedBlocks > missedBlocksThreshold {
 			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
