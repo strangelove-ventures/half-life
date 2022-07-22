@@ -9,7 +9,7 @@ notifications:
     webhook:
       id: DISCORD_WEBHOOK_ID
       token: DISCORD_WEBHOOK_TOKEN
-    alert-user-ids: 
+    alert-user-ids:
       - DISCORD_USER_ID
     username: HalfLife
 validators:
@@ -29,3 +29,7 @@ validators:
   address: junovalcons...
   chain-id: juno-1
   rpc-retries: 20
+  # only alert when 2/20 missed blocks have occured (default is 1)
+  missed-blocks-threshold: 2
+  # enable this when the node is not in the active set
+  fullnode: true
