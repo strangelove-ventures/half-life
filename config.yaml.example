@@ -29,7 +29,7 @@ validators:
   address: junovalcons...
   chain-id: juno-1
   rpc-retries: 20
-  # only alert when 2/20 missed blocks have occured (default is 1)
+  # only alert when 2/20 missed blocks have occurred (default is 1)
   missed-blocks-threshold: 2
   # enable this when the node is not in the active set
   fullnode: true
