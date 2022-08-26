@@ -54,6 +54,10 @@ func monitorValidator(
 			} else {
 				slashingPeriod = slashingInfo.Params.SignedBlocksWindow
 				stats.SlashingPeriodUptime = 100.0 - 100.0*(float64(signingInfo.MissedBlocksCounter)/float64(slashingPeriod))
+
+				if stats.SlashingPeriodUptime < slashingPeriodUptimeErrorThreshold {
+					errs = append(errs, newSlashingSLAError(stats.SlashingPeriodUptime, slashingPeriodUptimeErrorThreshold))
+				}
 			}
 		}
 	}
@@ -426,6 +430,20 @@ func getAlertNotification(
 			stats.RPCError = true
 		case *BlockFetchError:
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
+		case *SlashingSLAError:
+			// Because Slashing SLA is a 10,000 block sliding window,
+			// we will be alerting for many hours under typical outage scenarios
+			// if we alert every ~10 minutes like we do for other AlertTypes.
+			//
+			// Therefore, we only alert if we haven't already alerted:
+
+			foundAlertTypes = append(foundAlertTypes, alertTypeSlashingSLA)
+
+			if alertState.AlertTypeCounts[alertTypeSlashingSLA] == 0 {
+				alertState.AlertTypeCounts[alertTypeSlashingSLA]++
+				addAlert(err)
+				setAlertLevel(alertLevelHigh)
+			}
 		case *MissedRecentBlocksError:
 			addRecentMissedBlocksAlertIfNecessary := func(alertLevel AlertLevel) {
 				if shouldNotifyForFoundAlertType(alertTypeMissedRecentBlocks) || stats.RecentMissedBlocks != recentMissedBlocksCounter {
@@ -536,6 +554,9 @@ func getAlertNotification(
 					}
 					alertState.RecentMissedBlocksCounter = 0
 					alertState.RecentMissedBlocksCounterMax = 0
+				case alertTypeSlashingSLA:
+					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "slashing sla uptime recovered")
+					alertNotification.NotifyForClear = true
 				default:
 				}
 			}

@@ -101,6 +101,21 @@ func newMissedRecentBlocksError(missed int64) *MissedRecentBlocksError {
 	return &MissedRecentBlocksError{missed}
 }
 
+type SlashingSLAError struct {
+	uptime float64
+	sla    float64
+}
+
+func (e *SlashingSLAError) Error() string {
+	return fmt.Sprintf("block signing uptime (%.02f%%) under SLA (%.02f%%)", e.uptime, e.sla)
+}
+func (e *SlashingSLAError) Active(config AlertConfig) bool {
+	return config.AlertActive(alertTypeSlashingSLA)
+}
+func newSlashingSLAError(uptime, sla float64) *SlashingSLAError {
+	return &SlashingSLAError{uptime, sla}
+}
+
 type GenericRPCError struct{ msg string }
 
 func (e *GenericRPCError) Error() string { return e.msg }
