@@ -12,8 +12,8 @@ import (
 
 const (
 	configFilePath                       = "./config.yaml"
-	slashingPeriodUptimeWarningThreshold = 99.80 // 20 / 10,000 blocks missed
-	slashingPeriodUptimeErrorThreshold   = 98    // 200 / 10,000 blocks missed
+	slashingPeriodUptimeWarningThreshold = 99.80 // 20 of the last 10,000 blocks missed
+	slashingPeriodUptimeErrorThreshold   = 98    // 200 of the last 10,000 blocks missed
 	recentBlocksToCheck                  = 20
 	notifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
 	recentMissedBlocksNotifyThreshold    = 10
