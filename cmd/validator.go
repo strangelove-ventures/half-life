@@ -426,7 +426,7 @@ func getAlertNotification(
 			stats.RPCError = true
 		case *ChainHaltError:
 			fmt.Printf("found chain halt error\n")
-			handleGenericAlert(err, alertTypeHalt, alertLevelCritical)
+			handleGenericAlert(err, alertTypeHalt, alertLevelHigh)
 			stats.RPCError = true
 		case *BlockFetchError:
 			handleGenericAlert(err, alertTypeBlockFetch, alertLevelWarning)
