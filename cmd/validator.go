@@ -475,7 +475,13 @@ func getAlertNotification(
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
 			if alertState.SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
-				if alertState.SentryGRPCErrorCounts[sentryName] >= sentryGRPCErrorNotifyThreshold {
+				var threshold int64
+				if vm.SentryGRPCErrorThreshold != nil {
+					threshold = *vm.SentryGRPCErrorThreshold
+				} else {
+					threshold = sentryGRPCErrorNotifyThreshold
+				}
+				if alertState.SentryGRPCErrorCounts[sentryName] >= threshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
