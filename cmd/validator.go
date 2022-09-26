@@ -415,6 +415,13 @@ func getAlertNotification(
 
 	recentMissedBlocksCounter := alertState.RecentMissedBlocksCounter
 
+	var sentryGRPCNotifyThreshold int64
+	if vm.SentryGRPCErrorThreshold != nil {
+		sentryGRPCNotifyThreshold = *vm.SentryGRPCErrorThreshold
+	} else {
+		sentryGRPCNotifyThreshold = sentryGRPCErrorNotifyThreshold
+	}
+
 	for _, err := range errs {
 		switch err := err.(type) {
 		case *JailedError:
@@ -475,13 +482,7 @@ func getAlertNotification(
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
 			if alertState.SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
-				var threshold int64
-				if vm.SentryGRPCErrorThreshold != nil {
-					threshold = *vm.SentryGRPCErrorThreshold
-				} else {
-					threshold = sentryGRPCErrorNotifyThreshold
-				}
-				if alertState.SentryGRPCErrorCounts[sentryName] >= threshold {
+				if alertState.SentryGRPCErrorCounts[sentryName] >= sentryGRPCNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
@@ -577,13 +578,7 @@ func getAlertNotification(
 			}
 		}
 		if !sentryFound && alertState.SentryGRPCErrorCounts[sentryName] > 0 {
-			var threshold int64
-			if vm.SentryGRPCErrorThreshold != nil {
-				threshold = *vm.SentryGRPCErrorThreshold
-			} else {
-				threshold = sentryGRPCErrorNotifyThreshold
-			}
-			if alertState.SentryGRPCErrorCounts[sentryName] > threshold {
+			if alertState.SentryGRPCErrorCounts[sentryName] > sentryGRPCNotifyThreshold {
 				alertNotification.NotifyForClear = true
 			}
 			alertState.SentryGRPCErrorCounts[sentryName] = 0
