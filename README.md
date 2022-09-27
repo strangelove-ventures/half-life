@@ -16,32 +16,9 @@ Discord messages are created in the configured webhook channel for:
 
 ## Quick start
 
-### Install Go
+### Download
 
-Go is necessary in order to install `halflife`.
-
-```
-# install
-wget https://golang.org/dl/go1.18.2.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.18.2.linux-amd64.tar.gz
-
-# source go
-cat <<EOF >> ~/.profile
-export GOROOT=/usr/local/go
-export GOPATH=$HOME/go
-export GO111MODULE=on
-export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
-EOF
-source ~/.profile
-go version
-```
-
-### Install halflife binary
-
-```
-cd ~/half-life
-go install
-```
+Binaries are available on the [releases](https://github.com/strangelove-ventures/half-life/releases) page.
 
 ### Setup config.yaml
 
@@ -49,6 +26,7 @@ Copy `config.yaml.example` to `config.yaml` and populate with your discord and v
 You can optionally provide the `sentries` array to also monitor the sentries via grpc.
 `rpc-retries` can optionally be provided to override the default of 5 RPC retries before alerting, useful for congested RPC servers.
 `fullnode` can be set to `true` to only monitor reachable and out of sync for the provided `sentries`. `address` is not required when `fullnode` is `true`.
+`sentry-grpc-error-threshold` can be provided for each validator to tune how many grpc errors are detected (roughtly 30 seconds between checks) before issuing a notification.
 
 See [here](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for how to create a webhook for a discord channel.
 
@@ -89,3 +67,31 @@ For high and critical errors, the configured discord user IDs will be tagged
 
 ![Screenshot from 2022-02-16 11-38-00](https://user-images.githubusercontent.com/6722152/154333667-af823075-73fc-4d41-97ce-40432f3450ac.png)
 
+## Build from source
+
+### Install Go
+
+Go is necessary in order to build `half-life` from source.
+
+```
+# install
+wget https://golang.org/dl/go1.18.2.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.18.2.linux-amd64.tar.gz
+
+# source go
+cat <<EOF >> ~/.profile
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export GO111MODULE=on
+export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+EOF
+source ~/.profile
+go version
+```
+
+### Install halflife binary
+
+```
+cd ~/half-life
+go install
+```
