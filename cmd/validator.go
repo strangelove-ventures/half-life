@@ -640,7 +640,7 @@ func getAlertNotification(
 			}
 		}
 		if !sentryHasOutOfSyncError && !sentryHasGRPCError && alertState.SentryOutOfSyncErrorCounts[sentryName] > 0 {
-			if alertState.SentryOutOfSyncErrorCounts[sentryName] > sentryOutOfSyncErrorNotifyThreshold {
+			if alertState.SentryOutOfSyncErrorCounts[sentryName] > sentryOutOfSyncNotifyThreshold {
 				alertNotification.NotifyForClear = true
 			}
 			alertState.SentryOutOfSyncErrorCounts[sentryName] = 0
