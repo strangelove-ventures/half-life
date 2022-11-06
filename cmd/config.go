@@ -167,16 +167,18 @@ type Sentry struct {
 }
 
 type ValidatorMonitor struct {
-	Name                     string    `yaml:"name"`
-	RPC                      string    `yaml:"rpc"`
-	FullNode                 bool      `yaml:"fullnode"`
-	Address                  string    `yaml:"address"`
-	ChainID                  string    `yaml:"chain-id"`
-	DiscordStatusMessageID   *string   `yaml:"discord-status-message-id"`
-	RPCRetries               *int      `yaml:"rpc-retries"`
-	MissedBlocksThreshold    *int64    `yaml:"missed-blocks-threshold"`
-	SentryGRPCErrorThreshold *int64    `yaml:"sentry-grpc-error-threshold"`
-	Sentries                 *[]Sentry `yaml:"sentries"`
+	Name                           string    `yaml:"name"`
+	RPC                            string    `yaml:"rpc"`
+	FullNode                       bool      `yaml:"fullnode"`
+	Address                        string    `yaml:"address"`
+	ChainID                        string    `yaml:"chain-id"`
+	DiscordStatusMessageID         *string   `yaml:"discord-status-message-id"`
+	RPCRetries                     *int      `yaml:"rpc-retries"`
+	MissedBlocksThreshold          *int64    `yaml:"missed-blocks-threshold"`
+	SentryGRPCErrorThreshold       *int64    `yaml:"sentry-grpc-error-threshold"`
+	SentryOutOfSyncBlocksThreshold *int64    `yaml:"sentry-out-of-sync-blocks-threshold"`
+	SentryOutOfSyncErrorThreshold  *int64    `yaml:"sentry-out-of-sync-error-threshold"`
+	Sentries                       *[]Sentry `yaml:"sentries"`
 }
 
 func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {

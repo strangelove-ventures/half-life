@@ -13,7 +13,7 @@ import (
 
 const (
 	rpcErrorRetries              = 5
-	outOfSyncThreshold           = 5
+	outOfSyncThresholdDefault    = 5
 	haltThresholdNanoseconds     = 3e11 // if nodes are stuck for > 5 minutes, will be considered halt
 	defaultMissedBlocksThreshold = 0
 )
@@ -288,7 +288,14 @@ func runMonitor(
 			errs = append(errs, sentryErrs...)
 		}
 
-		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(vm.FullNode)
+		var outOfSyncThreshold int64
+		if vm.SentryOutOfSyncBlocksThreshold != nil {
+			outOfSyncThreshold = *vm.SentryOutOfSyncBlocksThreshold
+		} else {
+			outOfSyncThreshold = outOfSyncThresholdDefault
+		}
+
+		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(vm.FullNode, outOfSyncThreshold)
 		if len(aggregatedErrs) > 0 {
 			errs = append(errs, aggregatedErrs...)
 		}
@@ -314,7 +321,7 @@ func (stats *ValidatorStats) increaseAlertLevel(alertLevel AlertLevel) {
 }
 
 // determine alert level and any additional errors now that RPC And sentry checks are complete
-func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode bool) (errs []error) {
+func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode bool, outOfSyncThreshold int64) (errs []error) {
 	sentryErrorCount := 0
 	for _, sentryStat := range stats.SentryStats {
 		if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
@@ -422,6 +429,13 @@ func getAlertNotification(
 		sentryGRPCNotifyThreshold = sentryGRPCErrorNotifyThreshold
 	}
 
+	var sentryOutOfSyncNotifyThreshold int64
+	if vm.SentryOutOfSyncErrorThreshold != nil {
+		sentryOutOfSyncNotifyThreshold = *vm.SentryOutOfSyncErrorThreshold
+	} else {
+		sentryOutOfSyncNotifyThreshold = sentryOutOfSyncErrorNotifyThreshold
+	}
+
 	for _, err := range errs {
 		switch err := err.(type) {
 		case *JailedError:
@@ -494,7 +508,7 @@ func getAlertNotification(
 			foundSentryOutOfSyncErrors = append(foundSentryOutOfSyncErrors, sentryName)
 			if alertState.SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
 				addAlert(err)
-				if alertState.SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncErrorNotifyThreshold {
+				if alertState.SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
 				} else {
 					setAlertLevel(alertLevelWarning)
