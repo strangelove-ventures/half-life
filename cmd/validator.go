@@ -336,7 +336,7 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode boo
 	}
 
 	// If all sentries have errors, set overall alert level to high
-	if sentryErrorCount == len(stats.SentryStats) {
+	if sentryErrorCount > 0 && sentryErrorCount == len(stats.SentryStats) {
 		stats.increaseAlertLevel(alertLevelHigh)
 	}
 
