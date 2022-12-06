@@ -41,4 +41,4 @@ clean:
 
 build-half-life-docker:
 	docker build -t ghcr.io/strangelove-ventures/half-life/halflife:$(VERSION) -f ./Dockerfile .
-	# docker push ghcr.io/strangelove-ventures/half-life/halflife:$(VERSION)
+	docker push ghcr.io/strangelove-ventures/half-life/halflife:$(VERSION)
