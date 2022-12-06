@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	configFilePath                       = "./config.yaml"
-	slashingPeriodUptimeWarningThreshold = 99.80 // 20 of the last 10,000 blocks missed
-	slashingPeriodUptimeErrorThreshold   = 98    // 200 of the last 10,000 blocks missed
-	recentBlocksToCheck                  = 20
-	notifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
-	recentMissedBlocksNotifyThreshold    = 10
-	sentryGRPCErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
-	sentryOutOfSyncErrorNotifyThreshold  = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
-	sentryHaltErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
+	configFilePath                              = "./config.yaml"
+	defaultSlashingPeriodUptimeWarningThreshold = 99.80 // 20 of the last 10,000 blocks missed
+	defaultSlashingPeriodUptimeErrorThreshold   = 98    // 200 of the last 10,000 blocks missed
+	defaultRecentBlocksToCheck                  = 20
+	defaultNotifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	defaultRecentMissedBlocksNotifyThreshold    = 10
+	sentryGRPCErrorNotifyThreshold              = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
+	sentryOutOfSyncErrorNotifyThreshold         = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
+	sentryHaltErrorNotifyThreshold              = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
 )
 
 type AlertLevel int8
@@ -127,8 +127,13 @@ type ValidatorAlertNotification struct {
 }
 
 type NotificationsConfig struct {
-	Service string                `yaml:"service"`
-	Discord *DiscordChannelConfig `yaml:"discord"`
+	Service                              string                `yaml:"service"`
+	Discord                              *DiscordChannelConfig `yaml:"discord"`
+	SlashingPeriodUptimeWarningThreshold float64               `yaml:"slashing_warn_threshold"`
+	SlashingPeriodUptimeErrorThreshold   float64               `yaml:"slashing_error_threshold"`
+	RecentBlocksToCheck                  int64                 `yaml:"recent_blocks_to_check"`
+	NotifyEvery                          int64                 `yaml:"notify_every"`
+	RecentMissedBlocksNotifyThreshold    int64                 `yaml:"recent_missed_blocks_notify_threshold"`
 }
 
 type AlertConfig struct {
@@ -148,6 +153,24 @@ type HalfLifeConfig struct {
 	AlertConfig   AlertConfig          `yaml:"alerts"`
 	Notifications *NotificationsConfig `yaml:"notifications"`
 	Validators    []*ValidatorMonitor  `yaml:"validators"`
+}
+
+func (c *HalfLifeConfig) getUnsetDefaults() {
+	if c.Notifications.SlashingPeriodUptimeWarningThreshold == 0 {
+		c.Notifications.SlashingPeriodUptimeWarningThreshold = defaultSlashingPeriodUptimeWarningThreshold
+	}
+	if c.Notifications.SlashingPeriodUptimeErrorThreshold == 0 {
+		c.Notifications.SlashingPeriodUptimeErrorThreshold = defaultSlashingPeriodUptimeErrorThreshold
+	}
+	if c.Notifications.RecentBlocksToCheck == 0 {
+		c.Notifications.RecentBlocksToCheck = defaultRecentBlocksToCheck
+	}
+	if c.Notifications.NotifyEvery == 0 {
+		c.Notifications.NotifyEvery = defaultNotifyEvery
+	}
+	if c.Notifications.RecentMissedBlocksNotifyThreshold == 0 {
+		c.Notifications.RecentMissedBlocksNotifyThreshold = defaultRecentMissedBlocksNotifyThreshold
+	}
 }
 
 type DiscordWebhookConfig struct {

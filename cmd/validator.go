@@ -19,6 +19,7 @@ const (
 )
 
 func monitorValidator(
+	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
 ) (errs []IgnorableError) {
@@ -55,8 +56,8 @@ func monitorValidator(
 				slashingPeriod = slashingInfo.Params.SignedBlocksWindow
 				stats.SlashingPeriodUptime = 100.0 - 100.0*(float64(signingInfo.MissedBlocksCounter)/float64(slashingPeriod))
 
-				if stats.SlashingPeriodUptime < slashingPeriodUptimeErrorThreshold {
-					errs = append(errs, newSlashingSLAError(stats.SlashingPeriodUptime, slashingPeriodUptimeErrorThreshold))
+				if stats.SlashingPeriodUptime < config.Notifications.SlashingPeriodUptimeErrorThreshold {
+					errs = append(errs, newSlashingSLAError(stats.SlashingPeriodUptime, config.Notifications.SlashingPeriodUptimeErrorThreshold))
 				}
 			}
 		}
@@ -84,7 +85,7 @@ func monitorValidator(
 		stats.Timestamp = status.SyncInfo.LatestBlockTime
 		stats.RecentMissedBlocks = 0
 		if !vm.FullNode {
-			for i := stats.Height; i > stats.Height-recentBlocksToCheck && i > 0; i-- {
+			for i := stats.Height; i > stats.Height-config.Notifications.RecentBlocksToCheck && i > 0; i-- {
 				blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
 				block, err := node.Block(blockCtx, &i)
 				blockCtxCancel()
@@ -236,7 +237,7 @@ func runMonitor(
 			}
 
 			for i := 0; i < rpcRetries; i++ {
-				valErrs = monitorValidator(vm, &stats)
+				valErrs = monitorValidator(config, vm, &stats)
 				if len(valErrs) == 0 {
 					fmt.Printf("No errors found for validator: %s\n", vm.Name)
 					break
