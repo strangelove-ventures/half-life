@@ -12,11 +12,6 @@ notifications:
     alert-user-ids:
       - DISCORD_USER_ID
     username: HalfLife
-  slashing_warn_threshold: 99.80
-  slashing_error_threshold: 98
-  recent_blocks_to_check: 20
-  notify_every: 20
-  recent_missed_blocks_notify_threshold: 10
 validators:
 - name: Osmosis
   rpc: http://SOME_OSMOSIS_RPC_SERVER:26657
@@ -38,3 +33,8 @@ validators:
   missed-blocks-threshold: 2
   # enable this when the node is not in the active set
   fullnode: true
+  slashing_warn_threshold: 99.80
+  slashing_error_threshold: 98
+  recent_blocks_to_check: 20
+  notify_every: 20
+  recent_missed_blocks_notify_threshold: 10

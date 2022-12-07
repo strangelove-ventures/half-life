@@ -127,13 +127,8 @@ type ValidatorAlertNotification struct {
 }
 
 type NotificationsConfig struct {
-	Service                              string                `yaml:"service"`
-	Discord                              *DiscordChannelConfig `yaml:"discord"`
-	SlashingPeriodUptimeWarningThreshold float64               `yaml:"slashing_warn_threshold"`
-	SlashingPeriodUptimeErrorThreshold   float64               `yaml:"slashing_error_threshold"`
-	RecentBlocksToCheck                  int64                 `yaml:"recent_blocks_to_check"`
-	NotifyEvery                          int64                 `yaml:"notify_every"`
-	RecentMissedBlocksNotifyThreshold    int64                 `yaml:"recent_missed_blocks_notify_threshold"`
+	Service string                `yaml:"service"`
+	Discord *DiscordChannelConfig `yaml:"discord"`
 }
 
 type AlertConfig struct {
@@ -157,21 +152,24 @@ type HalfLifeConfig struct {
 
 func (c *HalfLifeConfig) getUnsetDefaults() {
 	fmt.Printf("%+v", *c.Notifications)
-	if c.Notifications.SlashingPeriodUptimeWarningThreshold == 0 {
-		c.Notifications.SlashingPeriodUptimeWarningThreshold = defaultSlashingPeriodUptimeWarningThreshold
+	for idx := range c.Validators {
+		if c.Validators[idx].SlashingPeriodUptimeWarningThreshold == 0 {
+			c.Validators[idx].SlashingPeriodUptimeWarningThreshold = defaultSlashingPeriodUptimeWarningThreshold
+		}
+		if c.Validators[idx].SlashingPeriodUptimeErrorThreshold == 0 {
+			c.Validators[idx].SlashingPeriodUptimeErrorThreshold = defaultSlashingPeriodUptimeErrorThreshold
+		}
+		if c.Validators[idx].RecentBlocksToCheck == 0 {
+			c.Validators[idx].RecentBlocksToCheck = defaultRecentBlocksToCheck
+		}
+		if c.Validators[idx].NotifyEvery == 0 {
+			c.Validators[idx].NotifyEvery = defaultNotifyEvery
+		}
+		if c.Validators[idx].RecentMissedBlocksNotifyThreshold == 0 {
+			c.Validators[idx].RecentMissedBlocksNotifyThreshold = defaultRecentMissedBlocksNotifyThreshold
+		}
 	}
-	if c.Notifications.SlashingPeriodUptimeErrorThreshold == 0 {
-		c.Notifications.SlashingPeriodUptimeErrorThreshold = defaultSlashingPeriodUptimeErrorThreshold
-	}
-	if c.Notifications.RecentBlocksToCheck == 0 {
-		c.Notifications.RecentBlocksToCheck = defaultRecentBlocksToCheck
-	}
-	if c.Notifications.NotifyEvery == 0 {
-		c.Notifications.NotifyEvery = defaultNotifyEvery
-	}
-	if c.Notifications.RecentMissedBlocksNotifyThreshold == 0 {
-		c.Notifications.RecentMissedBlocksNotifyThreshold = defaultRecentMissedBlocksNotifyThreshold
-	}
+
 }
 
 type DiscordWebhookConfig struct {
@@ -201,6 +199,12 @@ type ValidatorMonitor struct {
 	MissedBlocksThreshold    *int64    `yaml:"missed-blocks-threshold"`
 	SentryGRPCErrorThreshold *int64    `yaml:"sentry-grpc-error-threshold"`
 	Sentries                 *[]Sentry `yaml:"sentries"`
+
+	SlashingPeriodUptimeWarningThreshold float64 `yaml:"slashing_warn_threshold"`
+	SlashingPeriodUptimeErrorThreshold   float64 `yaml:"slashing_error_threshold"`
+	RecentBlocksToCheck                  int64   `yaml:"recent_blocks_to_check"`
+	NotifyEvery                          int64   `yaml:"notify_every"`
+	RecentMissedBlocksNotifyThreshold    int64   `yaml:"recent_missed_blocks_notify_threshold"`
 }
 
 func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {

@@ -55,7 +55,7 @@ func getColorForAlertLevel(alertLevel AlertLevel) int {
 	}
 }
 
-func getCurrentStatsEmbed(config *HalfLifeConfig, stats ValidatorStats, vm *ValidatorMonitor) discord.Embed {
+func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Embed {
 	var uptime string
 	var title string
 	if vm.FullNode {
@@ -129,7 +129,7 @@ func getCurrentStatsEmbed(config *HalfLifeConfig, stats ValidatorStats, vm *Vali
 				} else {
 					recentSignedBlocksIcon = iconGood
 				}
-				recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, config.Notifications.RecentBlocksToCheck-stats.RecentMissedBlocks, config.Notifications.RecentBlocksToCheck)
+				recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, vm.RecentBlocksToCheck-stats.RecentMissedBlocks, vm.RecentBlocksToCheck)
 			}
 		}
 		latestBlock = fmt.Sprintf("%s Height **%s** - **%s**", rpcStatusIcon, fmt.Sprint(stats.Height), formattedTime(stats.Timestamp))
@@ -182,7 +182,7 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 		service.postMutex.Lock()
 		_, err := client.UpdateMessage(snowflake.Snowflake(*vm.DiscordStatusMessageID), discord.WebhookMessageUpdate{
 			Embeds: &[]discord.Embed{
-				getCurrentStatsEmbed(config, stats, vm),
+				getCurrentStatsEmbed(stats, vm),
 			},
 		}, rest.WithCtx(ctx))
 		service.postMutex.Unlock()
@@ -195,7 +195,7 @@ func (service *DiscordNotificationService) UpdateValidatorRealtimeStatus(
 		message, err := client.CreateMessage(discord.WebhookMessageCreate{
 			Username: config.Notifications.Discord.Username,
 			Embeds: []discord.Embed{
-				getCurrentStatsEmbed(config, stats, vm),
+				getCurrentStatsEmbed(stats, vm),
 			},
 		}, rest.WithCtx(ctx))
 		service.postMutex.Unlock()
