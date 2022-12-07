@@ -122,11 +122,12 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 			rpcStatusIcon = iconGood
 			if !vm.FullNode {
 				var recentSignedBlocksIcon string
-				if stats.RecentMissedBlockAlertLevel >= alertLevelHigh {
+				switch level := stats.RecentMissedBlockAlertLevel; {
+				case level >= alertLevelHigh:
 					recentSignedBlocksIcon = iconError
-				} else if stats.RecentMissedBlockAlertLevel == alertLevelWarning {
+				case level == alertLevelWarning:
 					recentSignedBlocksIcon = iconWarning
-				} else {
+				default:
 					recentSignedBlocksIcon = iconGood
 				}
 				recentSignedBlocks = fmt.Sprintf("%s Latest Blocks Signed: **%d/%d**", recentSignedBlocksIcon, vm.RecentBlocksToCheck-stats.RecentMissedBlocks, vm.RecentBlocksToCheck)

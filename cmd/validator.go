@@ -125,7 +125,6 @@ func monitorValidator(
 			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks, vm.RecentBlocksToCheck))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
-
 				for i := stats.Height - vm.RecentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod) && i > 0; i-- {
 					blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
 					block, err := node.Block(blockCtx, &i)
@@ -347,16 +346,14 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(vm *Validato
 				if stats.SlashingPeriodUptime > vm.SlashingPeriodUptimeWarningThreshold {
 					// no recent missed blocks and above warning threshold for slashing period uptime, all good
 					return
-				} else {
-					// Warning for recovering from downtime. Not error because we are currently signing
-					stats.increaseAlertLevel(alertLevelWarning)
-					return
 				}
-			} else {
-				// Warning for missing recent blocks, but have signed current block
+				// Warning for recovering from downtime. Not error because we are currently signing
 				stats.increaseAlertLevel(alertLevelWarning)
 				return
 			}
+			// Warning for missing recent blocks, but have signed current block
+			stats.increaseAlertLevel(alertLevelWarning)
+			return
 		}
 
 		// past this, we have not signed the most recent block

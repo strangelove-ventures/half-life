@@ -169,7 +169,6 @@ func (c *HalfLifeConfig) getUnsetDefaults() {
 			c.Validators[idx].RecentMissedBlocksNotifyThreshold = defaultRecentMissedBlocksNotifyThreshold
 		}
 	}
-
 }
 
 type DiscordWebhookConfig struct {
@@ -216,7 +215,7 @@ func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *syn
 		fmt.Printf("Error during config yaml marshal %v\n", err)
 	}
 
-	err = os.WriteFile(configFile, yamlBytes, 0644)
+	err = os.WriteFile(configFile, yamlBytes, 0600)
 	if err != nil {
 		fmt.Printf("Error saving config yaml %v\n", err)
 	}
