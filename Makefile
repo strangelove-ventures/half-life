@@ -12,21 +12,7 @@ ifeq (,$(VERSION))
   endif
 endif
 
-PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
-DOCKER := $(shell which docker)
-BUILDDIR ?= $(CURDIR)/build
-export GO111MODULE = on
-
-build_tags += $(BUILD_TAGS)
-build_tags := $(strip $(build_tags))
-ldflags += $(LDFLAGS)
-ldflags := $(strip $(ldflags))
-
-# process linker flags
-ldflags = -X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)"
-ldflags += -w -s
-
-BUILD_FLAGS := -tags "$(build_tags)" -ldflags '$(ldflags)'
+FQCN = ghcr.io/strangelove-ventures/half-life/halflife # default value, overide with: make -e FQCN="foo"
 
 all: install
 
@@ -40,5 +26,5 @@ clean:
 	rm -rf build
 
 build-half-life-docker:
-	docker build -t ghcr.io/strangelove-ventures/half-life/halflife:$(VERSION) -f ./Dockerfile .
-	docker push ghcr.io/strangelove-ventures/half-life/halflife:$(VERSION)
+	docker build -t $(FQCN):$(VERSION) -f ./Dockerfile .
+	docker push $(FQCN):$(VERSION)

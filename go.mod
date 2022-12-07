@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/DisgoOrg/disgo v0.7.2
 	github.com/DisgoOrg/snowflake v1.0.4
-	github.com/Workiva/go-datastructures v1.0.52
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/spf13/cobra v1.3.0
 	github.com/tendermint/tendermint v0.34.14

@@ -22,6 +22,7 @@ const (
 	sentryHaltErrorNotifyThreshold                      = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
 )
 
+
 type AlertLevel int8
 
 const (

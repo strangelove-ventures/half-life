@@ -10,7 +10,7 @@ var rootCmd = &cobra.Command{
 	Use:   "halflife",
 	Short: "Validator monitoring and alerting",
 	Long: `Cosmos-based blockchain validator monitoring and alerting utility
-	
+
 Checks for scenarios such as:
 - Slashing period uptime
 - Recent missed blocks (is the validator signing currently)
