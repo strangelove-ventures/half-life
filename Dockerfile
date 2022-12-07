@@ -4,8 +4,7 @@ ENV PACKAGES make git
 
 RUN apk add --no-cache $PACKAGES
 
-WORKDIR /go/src/github.com/strangelove-ventures/half-life
-
+WORKDIR /go/src/
 ADD . .
 
 ARG TARGETARCH=amd64
@@ -19,6 +18,6 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /root
 
-COPY --from=build-env /go/src/github.com/strangelove-ventures/half-life/bin/halflife  /usr/bin/halflife
+COPY --from=build-env /go/src/bin/halflife  /usr/bin/halflife
 
 CMD ["halflife"]

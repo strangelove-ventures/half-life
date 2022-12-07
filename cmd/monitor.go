@@ -25,6 +25,7 @@ var monitorCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Error parsing config.yaml: %v", err)
 		}
+		config.updateNotificationParams()
 
 		if config.Notifications == nil {
 			panic("Notifications configuration is not present in config.yaml")
