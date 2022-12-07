@@ -1,3 +1,5 @@
 config.yaml
 halflife
+**/.DS_Store
+.idea/*
 dist/
