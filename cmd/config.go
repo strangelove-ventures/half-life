@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	configFilePath                              = "./config.yaml"
-	defaultSlashingPeriodUptimeWarningThreshold = 99.80 // 20 of the last 10,000 blocks missed
-	defaultSlashingPeriodUptimeErrorThreshold   = 98    // 200 of the last 10,000 blocks missed
-	defaultRecentBlocksToCheck                  = 20
-	defaultNotifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
-	defaultRecentMissedBlocksNotifyThreshold    = 10
-	sentryGRPCErrorNotifyThreshold              = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
-	sentryOutOfSyncErrorNotifyThreshold         = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
-	sentryHaltErrorNotifyThreshold              = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
+	configFilePath                                      = "./config.yaml"
+	defaultSlashingPeriodUptimeWarningThreshold float64 = 99.80 // 20 of the last 10,000 blocks missed
+	defaultSlashingPeriodUptimeErrorThreshold   float64 = 98    // 200 of the last 10,000 blocks missed
+	defaultRecentBlocksToCheck                  int64   = 20
+	defaultNotifyEvery                          int64   = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	defaultRecentMissedBlocksNotifyThreshold    int64   = 10
+	sentryGRPCErrorNotifyThreshold                      = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
+	sentryOutOfSyncErrorNotifyThreshold                 = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
+	sentryHaltErrorNotifyThreshold                      = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
 )
 
 type AlertLevel int8

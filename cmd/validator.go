@@ -122,11 +122,11 @@ func monitorValidator(
 		}
 
 		if !vm.FullNode && stats.RecentMissedBlocks > missedBlocksThreshold {
-			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks))
+			errs = append(errs, newMissedRecentBlocksError(stats.RecentMissedBlocks, config.Notifications.RecentBlocksToCheck))
 			// Go back to find last signed block
 			if stats.LastSignedBlockHeight == -1 {
 
-				for i := stats.Height - recentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod) && i > 0; i-- {
+				for i := stats.Height - config.Notifications.RecentBlocksToCheck; stats.LastSignedBlockHeight == -1 && i > (stats.Height-slashingPeriod) && i > 0; i-- {
 					blockCtx, blockCtxCancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
 					block, err := node.Block(blockCtx, &i)
 					blockCtxCancel()
@@ -289,13 +289,13 @@ func runMonitor(
 			errs = append(errs, sentryErrs...)
 		}
 
-		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(vm.FullNode)
+		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(config, vm.FullNode)
 		if len(aggregatedErrs) > 0 {
 			errs = append(errs, aggregatedErrs...)
 		}
 
 		alertStateLock.Lock()
-		notification := getAlertNotification(vm, &stats, alertState, errs)
+		notification := getAlertNotification(config, vm, &stats, alertState, errs)
 		alertStateLock.Unlock()
 
 		if notification != nil {
@@ -315,7 +315,7 @@ func (stats *ValidatorStats) increaseAlertLevel(alertLevel AlertLevel) {
 }
 
 // determine alert level and any additional errors now that RPC And sentry checks are complete
-func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode bool) (errs []error) {
+func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(config *HalfLifeConfig, fullnode bool) (errs []error) {
 	sentryErrorCount := 0
 	for _, sentryStat := range stats.SentryStats {
 		if sentryStat.SentryAlertType != sentryAlertTypeGRPCError {
@@ -344,7 +344,7 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode boo
 	if !fullnode {
 		if stats.Height == stats.LastSignedBlockHeight {
 			if stats.RecentMissedBlocks == 0 {
-				if stats.SlashingPeriodUptime > slashingPeriodUptimeWarningThreshold {
+				if stats.SlashingPeriodUptime > config.Notifications.SlashingPeriodUptimeWarningThreshold {
 					// no recent missed blocks and above warning threshold for slashing period uptime, all good
 					return
 				} else {
@@ -361,9 +361,9 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode boo
 
 		// past this, we have not signed the most recent block
 
-		if stats.RecentMissedBlocks < recentBlocksToCheck {
+		if stats.RecentMissedBlocks < config.Notifications.RecentBlocksToCheck {
 			// we have missed some, but not all, of the recent blocks to check
-			if stats.SlashingPeriodUptime > slashingPeriodUptimeErrorThreshold {
+			if stats.SlashingPeriodUptime > config.Notifications.SlashingPeriodUptimeErrorThreshold {
 				stats.increaseAlertLevel(alertLevelWarning)
 			} else {
 				// we are below slashing period uptime error threshold
@@ -379,6 +379,7 @@ func (stats *ValidatorStats) determineAggregatedErrorsAndAlertLevel(fullnode boo
 
 // requires locked alertState
 func getAlertNotification(
+	config *HalfLifeConfig,
 	vm *ValidatorMonitor,
 	stats *ValidatorStats,
 	alertState *ValidatorAlertState,
@@ -402,7 +403,7 @@ func getAlertNotification(
 
 	shouldNotifyForFoundAlertType := func(alertType AlertType) bool {
 		foundAlertTypes = append(foundAlertTypes, alertType)
-		shouldNotify := alertState.AlertTypeCounts[alertType]%notifyEvery == 0
+		shouldNotify := alertState.AlertTypeCounts[alertType]%config.Notifications.NotifyEvery == 0
 		alertState.AlertTypeCounts[alertType]++
 		return shouldNotify
 	}
@@ -460,7 +461,7 @@ func getAlertNotification(
 				}
 			}
 			if stats.RecentMissedBlocks > recentMissedBlocksCounter {
-				if stats.RecentMissedBlocks > recentMissedBlocksNotifyThreshold {
+				if stats.RecentMissedBlocks > config.Notifications.RecentMissedBlocksNotifyThreshold {
 					stats.RecentMissedBlockAlertLevel = alertLevelHigh
 					addRecentMissedBlocksAlertIfNecessary(alertLevelHigh)
 				} else {
@@ -481,7 +482,7 @@ func getAlertNotification(
 		case *SentryGRPCError:
 			sentryName := err.sentry
 			foundSentryGRPCErrors = append(foundSentryGRPCErrors, sentryName)
-			if alertState.SentryGRPCErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
+			if alertState.SentryGRPCErrorCounts[sentryName]%config.Notifications.NotifyEvery == 0 || alertState.SentryGRPCErrorCounts[sentryName] == sentryGRPCErrorNotifyThreshold {
 				addAlert(err)
 				if alertState.SentryGRPCErrorCounts[sentryName] >= sentryGRPCNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
@@ -493,7 +494,7 @@ func getAlertNotification(
 		case *SentryOutOfSyncError:
 			sentryName := err.sentry
 			foundSentryOutOfSyncErrors = append(foundSentryOutOfSyncErrors, sentryName)
-			if alertState.SentryOutOfSyncErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
+			if alertState.SentryOutOfSyncErrorCounts[sentryName]%config.Notifications.NotifyEvery == 0 || alertState.SentryOutOfSyncErrorCounts[sentryName] == sentryOutOfSyncErrorNotifyThreshold {
 				addAlert(err)
 				if alertState.SentryOutOfSyncErrorCounts[sentryName] >= sentryOutOfSyncErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
@@ -505,7 +506,7 @@ func getAlertNotification(
 		case *SentryHaltError:
 			sentryName := err.sentry
 			foundSentryHaltErrors = append(foundSentryHaltErrors, sentryName)
-			if alertState.SentryHaltErrorCounts[sentryName]%notifyEvery == 0 || alertState.SentryHaltErrorCounts[sentryName] == sentryHaltErrorNotifyThreshold {
+			if alertState.SentryHaltErrorCounts[sentryName]%config.Notifications.NotifyEvery == 0 || alertState.SentryHaltErrorCounts[sentryName] == sentryHaltErrorNotifyThreshold {
 				addAlert(err)
 				if alertState.SentryHaltErrorCounts[sentryName] >= sentryHaltErrorNotifyThreshold {
 					setAlertLevel(alertLevelHigh)
@@ -557,7 +558,7 @@ func getAlertNotification(
 					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "rpc block fetch error")
 				case alertTypeMissedRecentBlocks:
 					alertNotification.ClearedAlerts = append(alertNotification.ClearedAlerts, "missed recent blocks")
-					if alertState.RecentMissedBlocksCounterMax > recentMissedBlocksNotifyThreshold {
+					if alertState.RecentMissedBlocksCounterMax > config.Notifications.RecentMissedBlocksNotifyThreshold {
 						alertNotification.NotifyForClear = true
 					}
 					alertState.RecentMissedBlocksCounter = 0
