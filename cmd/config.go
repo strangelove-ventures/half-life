@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	configFilePath                       = "./config.yaml"
-	slashingPeriodUptimeWarningThreshold = 99.80 // 20 of the last 10,000 blocks missed
-	slashingPeriodUptimeErrorThreshold   = 98    // 200 of the last 10,000 blocks missed
-	recentBlocksToCheck                  = 20
-	notifyEvery                          = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
-	recentMissedBlocksNotifyThreshold    = 10
-	sentryGRPCErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
-	sentryOutOfSyncErrorNotifyThreshold  = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
-	sentryHaltErrorNotifyThreshold       = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
+	configFilePath                                      = "./config.yaml"
+	defaultSlashingPeriodUptimeWarningThreshold float64 = 99.80 // 20 of the last 10,000 blocks missed
+	defaultSlashingPeriodUptimeErrorThreshold   float64 = 98    // 200 of the last 10,000 blocks missed
+	defaultRecentBlocksToCheck                  int64   = 20
+	defaultNotifyEvery                          int64   = 20 // check runs every ~30 seconds, so will notify for continued errors and rollup stats every ~10 mins
+	defaultRecentMissedBlocksNotifyThreshold    int64   = 10
+	sentryGRPCErrorNotifyThreshold                      = 1 // will notify with error for any more than this number of consecutive grpc errors for a given sentry
+	sentryOutOfSyncErrorNotifyThreshold                 = 1 // will notify with error for any more than this number of consecutive out of sync errors for a given sentry
+	sentryHaltErrorNotifyThreshold                      = 1 // will notify with error for any more than this number of consecutive halt errors for a given sentry
 )
 
 type AlertLevel int8
@@ -150,6 +150,27 @@ type HalfLifeConfig struct {
 	Validators    []*ValidatorMonitor  `yaml:"validators"`
 }
 
+func (c *HalfLifeConfig) getUnsetDefaults() {
+	fmt.Printf("%+v", *c.Notifications)
+	for idx := range c.Validators {
+		if c.Validators[idx].SlashingPeriodUptimeWarningThreshold == 0 {
+			c.Validators[idx].SlashingPeriodUptimeWarningThreshold = defaultSlashingPeriodUptimeWarningThreshold
+		}
+		if c.Validators[idx].SlashingPeriodUptimeErrorThreshold == 0 {
+			c.Validators[idx].SlashingPeriodUptimeErrorThreshold = defaultSlashingPeriodUptimeErrorThreshold
+		}
+		if c.Validators[idx].RecentBlocksToCheck == 0 {
+			c.Validators[idx].RecentBlocksToCheck = defaultRecentBlocksToCheck
+		}
+		if c.Validators[idx].NotifyEvery == 0 {
+			c.Validators[idx].NotifyEvery = defaultNotifyEvery
+		}
+		if c.Validators[idx].RecentMissedBlocksNotifyThreshold == 0 {
+			c.Validators[idx].RecentMissedBlocksNotifyThreshold = defaultRecentMissedBlocksNotifyThreshold
+		}
+	}
+}
+
 type DiscordWebhookConfig struct {
 	ID    string `yaml:"id"`
 	Token string `yaml:"token"`
@@ -177,6 +198,12 @@ type ValidatorMonitor struct {
 	MissedBlocksThreshold    *int64    `yaml:"missed-blocks-threshold"`
 	SentryGRPCErrorThreshold *int64    `yaml:"sentry-grpc-error-threshold"`
 	Sentries                 *[]Sentry `yaml:"sentries"`
+
+	SlashingPeriodUptimeWarningThreshold float64 `yaml:"slashing_warn_threshold"`
+	SlashingPeriodUptimeErrorThreshold   float64 `yaml:"slashing_error_threshold"`
+	RecentBlocksToCheck                  int64   `yaml:"recent_blocks_to_check"`
+	NotifyEvery                          int64   `yaml:"notify_every"`
+	RecentMissedBlocksNotifyThreshold    int64   `yaml:"recent_missed_blocks_notify_threshold"`
 }
 
 func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *sync.Mutex) {
@@ -188,7 +215,7 @@ func saveConfig(configFile string, config *HalfLifeConfig, writeConfigMutex *syn
 		fmt.Printf("Error during config yaml marshal %v\n", err)
 	}
 
-	err = os.WriteFile(configFile, yamlBytes, 0644)
+	err = os.WriteFile(configFile, yamlBytes, 0600)
 	if err != nil {
 		fmt.Printf("Error saving config yaml %v\n", err)
 	}

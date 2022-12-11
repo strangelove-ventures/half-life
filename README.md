@@ -22,7 +22,7 @@ Binaries are available on the [releases](https://github.com/strangelove-ventures
 
 ### Setup config.yaml
 
-Copy `config.yaml.example` to `config.yaml` and populate with your discord and validator information. 
+Copy `config.yaml.example` to `config.yaml` and populate with your discord and validator information.
 You can optionally provide the `sentries` array to also monitor the sentries via grpc.
 `rpc-retries` can optionally be provided to override the default of 5 RPC retries before alerting, useful for congested RPC servers.
 `fullnode` can be set to `true` to only monitor reachable and out of sync for the provided `sentries`. `address` is not required when `fullnode` is `true`.
