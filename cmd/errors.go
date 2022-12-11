@@ -89,16 +89,19 @@ func newBlockFetchError(height int64, address string) *BlockFetchError {
 	return &BlockFetchError{height, address}
 }
 
-type MissedRecentBlocksError struct{ missed int64 }
+type MissedRecentBlocksError struct {
+	missed  int64
+	toCheck int64
+}
 
 func (e *MissedRecentBlocksError) Error() string {
-	return fmt.Sprintf("missed %d/%d most recent blocks", e.missed, recentBlocksToCheck)
+	return fmt.Sprintf("missed %d/%d most recent blocks", e.missed, e.toCheck)
 }
 func (e *MissedRecentBlocksError) Active(config AlertConfig) bool {
 	return config.AlertActive(alertTypeMissedRecentBlocks)
 }
-func newMissedRecentBlocksError(missed int64) *MissedRecentBlocksError {
-	return &MissedRecentBlocksError{missed}
+func newMissedRecentBlocksError(missed, toCheck int64) *MissedRecentBlocksError {
+	return &MissedRecentBlocksError{missed, toCheck}
 }
 
 type SlashingSLAError struct {
