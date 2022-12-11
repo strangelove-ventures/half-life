@@ -25,6 +25,6 @@ build:
 clean:
 	rm -rf build
 
-build-half-life-docker:
+build-docker:
 	docker build -t $(FQCN):$(VERSION) -f ./Dockerfile .
 	docker push $(FQCN):$(VERSION)
