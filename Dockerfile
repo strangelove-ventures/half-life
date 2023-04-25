@@ -18,6 +18,6 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /root
 
-COPY --from=build-env /go/src/bin/halflife  /usr/bin/halflife
+COPY --from=build-env /go/src/bin/cmb  /usr/bin/cmb
 
-CMD ["halflife"]
+CMD ["cmb"]

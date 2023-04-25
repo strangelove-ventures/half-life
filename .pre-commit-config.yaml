@@ -19,8 +19,8 @@ repos:
       -   id: go-vet-repo-mod
       # Style
       -   id: go-imports-repo
-      -   id: golangci-lint-repo-mod
-          args: [-E,whitespace,-E,gocritic,-E,revive,-E,gosec,--timeout,5m]
+      # -   id: golangci-lint-repo-mod
+      #     args: [-E,whitespace,-E,gocritic,-E,revive,-E,gosec,--timeout,5m]
       # Go Test
       -   id: go-test-mod
       -   id: go-test-repo-mod

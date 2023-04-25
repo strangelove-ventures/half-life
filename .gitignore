@@ -1,5 +1,6 @@
 config.yaml
-halflife
+cmb
 **/.DS_Store
 .idea/*
 dist/
+.badger_db

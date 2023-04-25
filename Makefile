@@ -12,15 +12,13 @@ ifeq (,$(VERSION))
   endif
 endif
 
-FQCN = ghcr.io/strangelove-ventures/half-life/halflife # default value, overide with: make -e FQCN="foo"
+FQCN = docker.io/staking4all/celestia-monitoring-bot
 
-all: install
-
-install: go.sum
-	go install .
+all:
+	go run . monitor
 
 build:
-	go build -o bin/halflife .
+	go build -o bin/cmb .
 
 clean:
 	rm -rf build

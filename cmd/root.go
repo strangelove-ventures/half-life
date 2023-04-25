@@ -7,7 +7,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "halflife",
+	Use:   "cmb",
 	Short: "Validator monitoring and alerting",
 	Long: `Cosmos-based blockchain validator monitoring and alerting utility
 

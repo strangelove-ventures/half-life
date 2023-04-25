@@ -1,72 +1,71 @@
 package cmd
 
 import (
-	"fmt"
-	"log"
 	"os"
-	"sync"
 
 	"github.com/spf13/cobra"
+	"github.com/staking4all/celestia-monitoring-bot/services/db"
+	"github.com/staking4all/celestia-monitoring-bot/services/models"
+	"github.com/staking4all/celestia-monitoring-bot/services/monitor"
+	"github.com/staking4all/celestia-monitoring-bot/services/telegram"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
 
 var monitorCmd = &cobra.Command{
 	Use:   "monitor",
 	Short: "Daemon to monitor validators",
-	Long:  "Monitors validators and pushes alerts to Discord using the configuration in config.yaml",
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  "Monitors validators and pushes alerts to Telegram",
+	Args:  cobra.ExactArgs(0),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		configFile, _ := cmd.Flags().GetString("file")
 		dat, err := os.ReadFile(configFile)
 		if err != nil {
-			log.Fatalf("Error reading config.yaml: %v", err)
+			zap.L().Error("Error reading config.yaml", zap.Error(err))
+			return err
 		}
-		config := HalfLifeConfig{}
+
+		config := models.Config{}
 		err = yaml.Unmarshal(dat, &config)
 		if err != nil {
-			log.Fatalf("Error parsing config.yaml: %v", err)
+			zap.L().Error("Error parsing config.yaml", zap.Error(err))
+			return err
 		}
-		config.getUnsetDefaults()
+		config.LoadDefault()
 
-		if config.Notifications == nil {
-			panic("Notifications configuration is not present in config.yaml")
-		}
-
-		writeConfigMutex := sync.Mutex{}
-		// TODO implement more notification services e.g. slack, email
-		var notificationService NotificationService
-		switch config.Notifications.Service {
-		case "discord":
-			if config.Notifications.Discord == nil {
-				panic("Discord configuration not present in config.yaml")
-			}
-			notificationService = NewDiscordNotificationService(config.Notifications.Discord.Webhook.ID, config.Notifications.Discord.Webhook.Token)
-		default:
-			if config.Notifications.Service == "" {
-				panic("Notification service not configured in config.yaml")
-			}
-			panic(fmt.Sprintf("Notification service not supported: %s", config.Notifications.Service))
+		tn, err := telegram.NewTelegramNotificationService(config)
+		if err != nil {
+			zap.L().Error("error starting telegram notification", zap.Error(err))
+			return err
 		}
 
-		alertState := make(map[string]*ValidatorAlertState)
-		for i, vm := range config.Validators {
-			alertState[vm.Name] = &ValidatorAlertState{
-				AlertTypeCounts:            make(map[AlertType]int64),
-				SentryGRPCErrorCounts:      make(map[string]int64),
-				SentryOutOfSyncErrorCounts: make(map[string]int64),
-				SentryHaltErrorCounts:      make(map[string]int64),
-				SentryLatestHeight:         make(map[string]int64),
-			}
-			alertStateLock := sync.Mutex{}
-			if i == len(config.Validators)-1 {
-				runMonitor(notificationService, alertState[vm.Name], &alertStateLock, configFile, &config, vm, &writeConfigMutex)
-			} else {
-				go runMonitor(notificationService, alertState[vm.Name], &alertStateLock, configFile, &config, vm, &writeConfigMutex)
-			}
+		db, err := db.NewDB()
+		if err != nil {
+			zap.L().Error("error starting database", zap.Error(err))
+			return err
 		}
+		defer db.Close()
+
+		m, err := monitor.NewMonitorService(config, tn, db)
+		if err != nil {
+			zap.L().Error("error stating monitor", zap.Error(err))
+			return err
+		}
+		defer func() {
+			_ = m.Stop()
+		}()
+
+		err = m.Run()
+		if err != nil {
+			zap.L().Error("monitor running", zap.Error(err))
+			return err
+		}
+
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(monitorCmd)
-	monitorCmd.Flags().StringP("file", "f", configFilePath, "File path to config yaml")
+	monitorCmd.Flags().StringP("file", "f", "./config.yaml", "File path to config yaml")
 }
