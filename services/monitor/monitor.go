@@ -136,19 +136,25 @@ func (m *monitorService) Remove(userID int64, address string) error {
 	m.alertStateLock.Lock()
 	defer m.alertStateLock.Unlock()
 
+	if m.userState[userID] == nil {
+		return fmt.Errorf("not found")
+	}
+
+	if m.userState[userID][address] == nil {
+		return fmt.Errorf("not found")
+	}
+
+	delete(m.userState[userID], address)
+
+	if len(m.userState[userID]) == 0 {
+		delete(m.userState, userID)
+	}
+
 	if m.alertState[address] != nil {
 		delete(m.alertState[address], userID)
 
 		if len(m.alertState[address]) == 0 {
 			delete(m.alertState, address)
-		}
-	}
-
-	if m.userState[userID] != nil {
-		delete(m.userState[userID], address)
-
-		if len(m.userState[userID]) == 0 {
-			delete(m.userState, userID)
 		}
 	}
 

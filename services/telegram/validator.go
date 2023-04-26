@@ -38,7 +38,7 @@ func (t *telegramNotificationService) removeValidatorHandler(c telebot.Context) 
 	err := t.mm.Remove(c.Sender().ID, c.Args()[0])
 	if err != nil {
 		zap.L().Warn("removeHandler", zap.Int64("userID", c.Sender().ID), zap.String("userName", c.Sender().Username), zap.String("address", c.Args()[0]), zap.Error(err))
-		_, _ = t.Send(c.Chat(), err.Error())
+		_, _ = t.Send(c.Chat(), fmt.Sprintf("Error: ```%s```\n\nPlease use: */remove address*", err.Error()))
 		return err
 	}
 
