@@ -6,6 +6,7 @@ require (
 	github.com/cometbft/cometbft v0.37.0
 	github.com/cosmos/cosmos-sdk v0.47.1
 	github.com/dgraph-io/badger/v4 v4.1.0
+	github.com/kyokomi/emoji/v2 v2.2.12
 	github.com/spf13/cobra v1.6.1
 	go.uber.org/zap v1.23.0
 	gopkg.in/telebot.v3 v3.1.3
