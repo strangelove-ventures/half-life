@@ -50,7 +50,8 @@ func (t *telegramNotificationService) removeValidatorHandler(c telebot.Context) 
 }
 
 func (t *telegramNotificationService) statusHandler(c telebot.Context) error {
-	if len(c.Args()) != 1 {
+	if len(c.Args()) != 1 ||
+		!strings.HasPrefix(c.Args()[0], "celestiavalcons1") {
 		// TODO: list validators regitered to user
 		_, _ = t.Send(c.Chat(), "Please try `/status celestiavalcons1XXXXXXX`")
 		return nil
