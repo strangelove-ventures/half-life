@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/staking4all/celestia-monitoring-bot/services/models"
 	"go.uber.org/zap"
@@ -28,7 +29,8 @@ func (t *telegramNotificationService) addValidatorHandler(c telebot.Context) err
 }
 
 func (t *telegramNotificationService) removeValidatorHandler(c telebot.Context) error {
-	if len(c.Args()) != 1 {
+	if len(c.Args()) != 1 ||
+		!strings.HasPrefix(c.Args()[0], "celestiavalcons1") {
 		// TODO: list validators regitered to user
 		_, _ = t.Send(c.Chat(), "Please try `/remove celestiavalcons1XXXXXXX`")
 		return nil
@@ -38,7 +40,7 @@ func (t *telegramNotificationService) removeValidatorHandler(c telebot.Context) 
 	err := t.mm.Remove(c.Sender().ID, c.Args()[0])
 	if err != nil {
 		zap.L().Warn("removeHandler", zap.Int64("userID", c.Sender().ID), zap.String("userName", c.Sender().Username), zap.String("address", c.Args()[0]), zap.Error(err))
-		_, _ = t.Send(c.Chat(), fmt.Sprintf("Error: ```%s```\n\nPlease use: */remove address*", err.Error()))
+		_, _ = t.Send(c.Chat(), fmt.Sprintf("Error: ``` %s ```\n\nPlease use: */remove address*", err.Error()))
 		return err
 	}
 
