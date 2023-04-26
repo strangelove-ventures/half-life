@@ -89,7 +89,7 @@ func (m *monitorService) load(userID int64, v *models.Validator) error {
 	}
 
 	if m.userState[userID][validator.Address] != nil {
-		return fmt.Errorf("already regitered")
+		return fmt.Errorf("already registered")
 	}
 
 	if m.alertState[validator.Address] == nil {
