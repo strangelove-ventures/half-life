@@ -87,11 +87,26 @@ const (
 	sentryAlertTypeHalt
 )
 
+type WalletAlertType int8
+
+const (
+	walletAlertTypeNone WalletAlertType = iota
+	walletAlertTypeRPCError
+	walletAlertBalanceError
+)
+
 type SentryStats struct {
 	Name            string
 	Version         string
 	Height          int64
 	SentryAlertType SentryAlertType
+}
+type WalletStats struct {
+	Name            string
+	Address         string
+	Balance         int64
+	BalanceDenom    string
+	WalletAlertType WalletAlertType
 }
 
 type ValidatorStats struct {
@@ -103,6 +118,7 @@ type ValidatorStats struct {
 	LastSignedBlockTimestamp    time.Time
 	SlashingPeriodUptime        float64
 	SentryStats                 []*SentryStats
+	WalletStats                 []*WalletStats
 	AlertLevel                  AlertLevel
 	RPCError                    bool
 }
@@ -112,6 +128,8 @@ type ValidatorAlertState struct {
 	SentryGRPCErrorCounts        map[string]int64
 	SentryOutOfSyncErrorCounts   map[string]int64
 	SentryHaltErrorCounts        map[string]int64
+	WalletBalanceErrorCounts     map[string]int64
+	WalletRPCErrorCounts         map[string]int64
 	SentryLatestHeight           map[string]int64
 	RecentMissedBlocksCounter    int64
 	RecentMissedBlocksCounterMax int64
@@ -186,6 +204,12 @@ type Sentry struct {
 	Name string `yaml:"name"`
 	GRPC string `yaml:"grpc"`
 }
+type Wallet struct {
+	Address             string `yaml:"address"`
+	Name                string `yaml:"name"`
+	MinimumBalance      *int64 `yaml:"minimum"`
+	MinimumBalanceDenom string `yaml:"denom"`
+}
 
 type ValidatorMonitor struct {
 	Name                     string    `yaml:"name"`
@@ -198,6 +222,7 @@ type ValidatorMonitor struct {
 	MissedBlocksThreshold    *int64    `yaml:"missed-blocks-threshold"`
 	SentryGRPCErrorThreshold *int64    `yaml:"sentry-grpc-error-threshold"`
 	Sentries                 *[]Sentry `yaml:"sentries"`
+	Wallets                  *[]Wallet `yaml:"wallets"`
 
 	SlashingPeriodUptimeWarningThreshold float64 `yaml:"slashing_warn_threshold"`
 	SlashingPeriodUptimeErrorThreshold   float64 `yaml:"slashing_error_threshold"`

@@ -108,6 +108,30 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 			}
 		}
 	}
+	walletString := ""
+
+	if vm.Wallets != nil {
+		for _, vmWallet := range *vm.Wallets {
+			walletFound := false
+			for _, walletStats := range stats.WalletStats {
+				if vmWallet.Name == walletStats.Name {
+					var statusIcon string
+					if walletStats.WalletAlertType == walletAlertTypeNone {
+						statusIcon = iconGood
+						walletString += fmt.Sprintf("\n%s **%s** - Balance **%d%s** is above minimum of %d%s", statusIcon, walletStats.Name, walletStats.Balance, walletStats.BalanceDenom, *vmWallet.MinimumBalance, vmWallet.MinimumBalanceDenom)
+					} else {
+						statusIcon = iconError
+						walletString += fmt.Sprintf("\n%s **%s** - Balance **%d%s** is below minimum of %d%s", statusIcon, walletStats.Name, walletStats.Balance, walletStats.BalanceDenom, *vmWallet.MinimumBalance, vmWallet.MinimumBalanceDenom)
+					}
+					walletFound = true
+					break
+				}
+			}
+			if !walletFound {
+				walletString += fmt.Sprintf("\n%s **%s** - Not found", iconError, vmWallet.Name)
+			}
+		}
+	}
 
 	recentSignedBlocks := fmt.Sprintf("%s Latest Blocks Signed: **N/A**", iconWarning)
 
@@ -140,8 +164,8 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 		description = fmt.Sprintf("%s%s", latestBlock, sentryString)
 	} else {
 		if stats.Height == stats.LastSignedBlockHeight {
-			description = fmt.Sprintf("%s\n%s%s",
-				latestBlock, recentSignedBlocks, sentryString)
+			description = fmt.Sprintf("%s\n%s%s%s",
+				latestBlock, recentSignedBlocks, sentryString, walletString)
 		} else {
 			var lastSignedBlock string
 			if stats.LastSignedBlockHeight == -1 {
@@ -149,8 +173,8 @@ func getCurrentStatsEmbed(stats ValidatorStats, vm *ValidatorMonitor) discord.Em
 			} else {
 				lastSignedBlock = fmt.Sprintf("%s Last Signed **%s** - **%s**", iconError, fmt.Sprint(stats.LastSignedBlockHeight), formattedTime(stats.LastSignedBlockTimestamp))
 			}
-			description = fmt.Sprintf("%s\n%s\n%s%s",
-				latestBlock, lastSignedBlock, recentSignedBlocks, sentryString)
+			description = fmt.Sprintf("%s\n%s\n%s%s\n%s",
+				latestBlock, lastSignedBlock, recentSignedBlocks, sentryString, walletString)
 		}
 	}
 

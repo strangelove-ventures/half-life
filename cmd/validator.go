@@ -210,6 +210,65 @@ func monitorSentries(
 	return errs
 }
 
+func monitorWallet(
+	wg *sync.WaitGroup,
+	errs *[]error,
+	errsLock *sync.Mutex,
+	wallet Wallet,
+	stats *ValidatorStats,
+	vm *ValidatorMonitor,
+	alertState *ValidatorAlertState,
+	alertStateLock *sync.Mutex,
+) {
+
+	var errsToAdd []error
+	walletStats := WalletStats{Name: wallet.Name, Address: wallet.Address, WalletAlertType: walletAlertTypeNone}
+
+	client, err := getCosmosClient(vm.RPC, vm.ChainID)
+	if err != nil {
+		errsToAdd = append(errsToAdd, newGenericRPCError(err.Error()))
+	} else {
+
+		walletInfo, err := getWalletBalance(client, wallet.Address, wallet.MinimumBalanceDenom)
+		if err != nil {
+			errsToAdd = append(errsToAdd, newWalletAlertRPCError(wallet.Name, err.Error()))
+			walletStats.WalletAlertType = walletAlertTypeRPCError
+		} else {
+			walletStats.Balance = walletInfo.Balance.Amount.Int64()
+			walletStats.BalanceDenom = walletInfo.Balance.Denom
+
+			if walletStats.Balance < *wallet.MinimumBalance {
+				errsToAdd = append(errsToAdd, newWWalletAlertBalanceError(wallet.Name, *wallet.MinimumBalance, walletStats.Balance))
+				walletStats.WalletAlertType = walletAlertBalanceError
+			}
+		}
+	}
+
+	errsLock.Lock()
+	stats.WalletStats = append(stats.WalletStats, &walletStats)
+	*errs = append(*errs, errsToAdd...)
+	errsLock.Unlock()
+	wg.Done()
+}
+
+func monitorWallets(
+	stats *ValidatorStats,
+	vm *ValidatorMonitor,
+	alertState *ValidatorAlertState,
+	alertStateLock *sync.Mutex,
+) []error {
+	errs := make([]error, 0)
+	wg := sync.WaitGroup{}
+	errsLock := sync.Mutex{}
+	wallets := *vm.Wallets
+	wg.Add(len(wallets))
+	for _, wallet := range wallets {
+		go monitorWallet(&wg, &errs, &errsLock, wallet, stats, vm, alertState, alertStateLock)
+	}
+	wg.Wait()
+	return errs
+}
+
 func runMonitor(
 	notificationService NotificationService,
 	alertState *ValidatorAlertState,
@@ -223,6 +282,7 @@ func runMonitor(
 		stats := ValidatorStats{}
 		var valErrs []IgnorableError
 		var sentryErrs []error
+		var walletErrs []error
 
 		wg := sync.WaitGroup{}
 		fmt.Printf("Monitoring validator\n")
@@ -273,6 +333,18 @@ func runMonitor(
 				wg.Done()
 			}()
 		}
+		if vm.Wallets != nil {
+			wg.Add(1)
+			go func() {
+				walletErrs = monitorWallets(&stats, vm, alertState, alertStateLock)
+				if len(walletErrs) == 0 {
+					fmt.Printf("No errors found for wallets: %s\n", vm.Name)
+				} else {
+					fmt.Printf("Got wallet errors: +%v\n", walletErrs)
+				}
+				wg.Done()
+			}()
+		}
 
 		wg.Wait()
 
@@ -286,6 +358,9 @@ func runMonitor(
 		}
 		if len(sentryErrs) > 0 {
 			errs = append(errs, sentryErrs...)
+		}
+		if len(walletErrs) > 0 {
+			errs = append(errs, walletErrs...)
 		}
 
 		aggregatedErrs := stats.determineAggregatedErrorsAndAlertLevel(vm)

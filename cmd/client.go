@@ -7,6 +7,7 @@ import (
 
 	cosmosClient "github.com/cosmos/cosmos-sdk/client"
 	tmservice "github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -80,4 +81,13 @@ func getSentryInfo(grpcAddr string) (*tmservice.GetNodeInfoResponse, *tmservice.
 		return nil, nil, err
 	}
 	return nodeInfo, syncingInfo, nil
+}
+
+func getWalletBalance(client *cosmosClient.Context, address string, denom string) (*banktypes.QueryBalanceResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*RPCTimeoutSeconds))
+	defer cancel()
+	return banktypes.NewQueryClient(client).Balance(ctx, &banktypes.QueryBalanceRequest{
+		Address: address,
+		Denom:   denom,
+	})
 }

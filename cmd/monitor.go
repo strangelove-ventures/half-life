@@ -55,6 +55,8 @@ var monitorCmd = &cobra.Command{
 				SentryOutOfSyncErrorCounts: make(map[string]int64),
 				SentryHaltErrorCounts:      make(map[string]int64),
 				SentryLatestHeight:         make(map[string]int64),
+				WalletBalanceErrorCounts:   make(map[string]int64),
+				WalletRPCErrorCounts:       make(map[string]int64),
 			}
 			alertStateLock := sync.Mutex{}
 			if i == len(config.Validators)-1 {

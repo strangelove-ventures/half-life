@@ -161,3 +161,30 @@ func (e *SentryHaltError) Error() string {
 func newSentryHaltError(sentry string, durationNano int64) *SentryHaltError {
 	return &SentryHaltError{sentry, durationNano}
 }
+
+type WalletAlertRPCError struct {
+	wallet string
+	msg    string
+}
+
+func (e *WalletAlertRPCError) Error() string {
+
+	return fmt.Sprintf("%s RPC Error %s", e.wallet, e.msg)
+}
+func newWalletAlertRPCError(wallet string, msg string) *WalletAlertRPCError {
+	return &WalletAlertRPCError{wallet, msg}
+}
+
+type WalletAlertBalanceError struct {
+	wallet  string
+	minimum int64
+	balance int64
+}
+
+func (e *WalletAlertBalanceError) Error() string {
+
+	return fmt.Sprintf("%s Balance  %d is below threshold of %d", e.wallet, e.balance, e.minimum)
+}
+func newWWalletAlertBalanceError(wallet string, minimum int64, balance int64) *WalletAlertBalanceError {
+	return &WalletAlertBalanceError{wallet, minimum, balance}
+}
