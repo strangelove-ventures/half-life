@@ -1,6 +1,6 @@
 # !!!!!!!! DEPRECATION NOTICE !!!!!!!!
 
-Strangelove has moved to a [Prometheus](https://prometheus.io) monitoring and alerting stack. As such, we 
+Strangelove has moved to a [Prometheus](https://prometheus.io) monitoring and alerting stack. As such, we
 will no longer monitor chains through HalfLife. In the near future, this repository will be archived and made read-only.
 
 Strangelove will no longer maintain HalfLife. Please fork and use as you see fit.
