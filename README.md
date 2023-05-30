@@ -1,3 +1,12 @@
+# !!!!!!!! DEPRECATION NOTICE !!!!!!!!
+
+Strangelove has moved to a [Prometheus](https://prometheus.io) monitoring and alerting stack. As such, we
+will no longer monitor chains through HalfLife. In the near future, this repository will be archived and made read-only.
+
+Strangelove will no longer maintain HalfLife. Please fork and use as you see fit.
+
+We will only accept critical bug fix contributions. New features will not be accepted.
+
 # HalfLife
 
 HalfLife is a Cosmos-based blockchain validator monitoring and alerting utility
